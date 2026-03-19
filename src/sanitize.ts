@@ -5,7 +5,7 @@
 import { canonicalize } from "./canonicalize";
 import { guardInputLength } from "./errors";
 import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules";
-import type { SanitizationOptions, SanitizationResult, TrustBoundaryOptions } from "./types";
+import type { SanitizationOptions, SanitizationResult, SanitizeTelemetryEvent, TrustBoundaryOptions } from "./types";
 
 function safeHook(fn: () => void): void {
   try {
@@ -56,6 +56,18 @@ export function sanitizeUntrustedText(text: string, options?: SanitizationOption
           reason: "No sanitization rules matched",
         };
 
-  safeHook(() => options?.hooks?.onSanitize?.(result, { durationMs: Date.now() - start, inputLength: text.length }));
+  const durationMs = Date.now() - start;
+  safeHook(() => options?.hooks?.onSanitize?.(result, { durationMs, inputLength: text.length }));
+  safeHook(() => {
+    const event: SanitizeTelemetryEvent = {
+      kind: "sanitize",
+      timestamp: Date.now(),
+      durationMs,
+      inputLength: text.length,
+      redacted: result.redacted,
+      matchedRuleIds: result.matchedRuleIds,
+    };
+    options?.hooks?.onTelemetry?.(event);
+  });
   return result;
 }

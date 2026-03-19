@@ -60,6 +60,46 @@ export type ContextExhaustionOptions = {
 };
 
 // ---------------------------------------------------------------------------
+// Telemetry
+// ---------------------------------------------------------------------------
+
+type TelemetryEventBase = {
+  /** Unix ms timestamp at the moment the event fired. */
+  timestamp: number;
+  /** Elapsed time of the operation in milliseconds. */
+  durationMs: number;
+  /** Length of the original input string. */
+  inputLength: number;
+};
+
+export type ClassifyTelemetryEvent = TelemetryEventBase & {
+  kind: "classify";
+  risk: RiskLevel;
+  category: ThreatCategory;
+  confidence: number;
+  matchedRuleIds: string[];
+  source: "rules" | "semantic-adapter" | "no-match";
+};
+
+export type SanitizeTelemetryEvent = TelemetryEventBase & {
+  kind: "sanitize";
+  redacted: boolean;
+  matchedRuleIds: string[];
+};
+
+export type StreamTelemetryEvent = TelemetryEventBase & {
+  kind: "stream-flush";
+  risk: RiskLevel;
+  category: ThreatCategory;
+  confidence: number;
+  matchedRuleIds: string[];
+  source: "rules" | "semantic-adapter" | "no-match";
+};
+
+/** Discriminated union of all telemetry events emitted by the library. Narrow on `kind`. */
+export type TelemetryEvent = ClassifyTelemetryEvent | SanitizeTelemetryEvent | StreamTelemetryEvent;
+
+// ---------------------------------------------------------------------------
 // Observability hooks
 // ---------------------------------------------------------------------------
 
@@ -87,6 +127,8 @@ export type ClassificationHooks = {
   onClassify?: (result: ClassificationResult, meta: ClassifyMeta) => void;
   /** Fired after the semantic adapter is called (or skipped) in classifyWithAdapter(). */
   onAdapterCall?: (result: ClassificationResult, meta: AdapterMeta) => void;
+  /** Fired after every classify() call with a unified telemetry event. */
+  onTelemetry?: (event: ClassifyTelemetryEvent) => void;
 };
 
 /** Per-chunk metadata emitted by the streaming classifier. */
@@ -105,6 +147,8 @@ export type StreamHooks = {
   onChunk?: (meta: StreamChunkMeta) => void;
   /** Fired after flush() returns a result. totalDurationMs is from createStreamClassifier() or last reset(). */
   onFlush?: (result: ClassificationResult, meta: { totalDurationMs: number }) => void;
+  /** Fired after flush() with a unified telemetry event. */
+  onTelemetry?: (event: StreamTelemetryEvent) => void;
 };
 
 /** Timing metadata emitted by sanitization hooks. */
@@ -119,6 +163,8 @@ export type SanitizeMeta = {
 export type SanitizationHooks = {
   /** Fired after every sanitizeUntrustedText() call with the final result. */
   onSanitize?: (result: SanitizationResult, meta: SanitizeMeta) => void;
+  /** Fired after every sanitizeUntrustedText() call with a unified telemetry event. */
+  onTelemetry?: (event: SanitizeTelemetryEvent) => void;
 };
 
 // ---------------------------------------------------------------------------

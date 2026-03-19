@@ -9,6 +9,7 @@ import type {
   AsyncClassifierOptions,
   ClassificationResult,
   ClassifierOptions,
+  ClassifyTelemetryEvent,
   RiskLevel,
   RuleDefinition,
   RuleMatch,
@@ -143,7 +144,22 @@ export function classify(input: string, options?: ClassifierOptions): Classifica
   const canonicalInput = canonicalize(input);
   const exhaustion = checkContextExhaustion(input, canonicalInput, options);
   const result = exhaustion ?? classifyFromRules(canonicalInput, getRules(options));
-  safeHook(() => options?.hooks?.onClassify?.(result, { durationMs: Date.now() - start, inputLength: input.length }));
+  const durationMs = Date.now() - start;
+  safeHook(() => options?.hooks?.onClassify?.(result, { durationMs, inputLength: input.length }));
+  safeHook(() => {
+    const event: ClassifyTelemetryEvent = {
+      kind: "classify",
+      timestamp: Date.now(),
+      durationMs,
+      inputLength: input.length,
+      risk: result.risk,
+      category: result.category,
+      confidence: result.confidence,
+      matchedRuleIds: result.matchedRuleIds,
+      source: result.source,
+    };
+    options?.hooks?.onTelemetry?.(event);
+  });
   return result;
 }
 

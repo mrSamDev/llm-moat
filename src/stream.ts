@@ -4,7 +4,7 @@
  */
 import { classify } from "./classify";
 import { DEFAULT_MAX_INPUT_LENGTH, RISK_ORDER } from "./rules";
-import type { ClassificationResult, RiskLevel, StreamClassifier, StreamClassifierOptions } from "./types";
+import type { ClassificationResult, RiskLevel, StreamClassifier, StreamClassifierOptions, StreamTelemetryEvent } from "./types";
 
 function safeHook(fn: () => void): void {
   try {
@@ -49,7 +49,10 @@ export function createStreamClassifier(options?: StreamClassifierOptions): Strea
 
   // Pass maxInputLength: false to classify() — the stream classifier enforces
   // its own length limit by truncating accumulated input before calling classify.
-  const classifyOptions = { ...options, maxInputLength: false as const };
+  // Strip onTelemetry so internal classify() calls don't fire stream-level telemetry;
+  // the stream fires its own onTelemetry once from flush().
+  const { onTelemetry: _streamTelemetry, ...classifyHooks } = options?.hooks ?? {};
+  const classifyOptions = { ...options, maxInputLength: false as const, hooks: classifyHooks };
 
   let accumulated = "";
   let isCommitted = false;
@@ -108,7 +111,22 @@ export function createStreamClassifier(options?: StreamClassifierOptions): Strea
 
     flush(): ClassificationResult {
       const result = isCommittedResult ?? classify(accumulated, classifyOptions);
-      safeHook(() => options?.hooks?.onFlush?.(result, { totalDurationMs: Date.now() - startTime }));
+      const totalDurationMs = Date.now() - startTime;
+      safeHook(() => options?.hooks?.onFlush?.(result, { totalDurationMs }));
+      safeHook(() => {
+        const event: StreamTelemetryEvent = {
+          kind: "stream-flush",
+          timestamp: Date.now(),
+          durationMs: totalDurationMs,
+          inputLength: accumulated.length,
+          risk: result.risk,
+          category: result.category,
+          confidence: result.confidence,
+          matchedRuleIds: result.matchedRuleIds,
+          source: result.source,
+        };
+        options?.hooks?.onTelemetry?.(event);
+      });
       return result;
     },
 
