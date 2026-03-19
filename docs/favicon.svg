@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <!-- Moat -->
+  <ellipse cx="16" cy="27" rx="13" ry="4" fill="#4f8ef7" opacity="0.25"/>
+  <ellipse cx="16" cy="27" rx="10" ry="2.5" fill="#4f8ef7" opacity="0.2"/>
+  <!-- Castle base -->
+  <rect x="6" y="12" width="20" height="15" rx="1" fill="#e8e8e8"/>
+  <!-- Battlements -->
+  <rect x="6" y="7" width="4" height="7" rx="1" fill="#e8e8e8"/>
+  <rect x="14" y="7" width="4" height="7" rx="1" fill="#e8e8e8"/>
+  <rect x="22" y="7" width="4" height="7" rx="1" fill="#e8e8e8"/>
+  <!-- Gate arch -->
+  <rect x="13" y="18" width="6" height="9" rx="3" fill="#0d0d0d"/>
+  <!-- AI text -->
+  <text x="16" y="18" text-anchor="middle" font-family="system-ui, -apple-system, sans-serif" font-weight="700" font-size="6.5" fill="#0d0d0d">AI</text>
+</svg>

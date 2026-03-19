@@ -1,0 +1,76 @@
+{
+  "name": "llm-moat",
+  "version": "0.2.0",
+  "description": "TypeScript toolkit for prompt injection detection, sanitization, and LLM input security with rule-based and semantic classifier support.",
+  "keywords": [
+    "prompt-injection",
+    "llm",
+    "security",
+    "ai-safety",
+    "sanitize",
+    "prompt-security",
+    "llm-security",
+    "input-sanitization",
+    "ai-security",
+    "jailbreak-detection",
+    "prompt-defense",
+    "typescript"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "main": "dist/index.cjs",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    },
+    "./adapters/llm": {
+      "types": "./dist/adapters/llm.d.ts",
+      "import": "./dist/adapters/llm.js",
+      "require": "./dist/adapters/llm.cjs"
+    },
+    "./adapters/anthropic": {
+      "types": "./dist/adapters/anthropic.d.ts",
+      "import": "./dist/adapters/anthropic.js",
+      "require": "./dist/adapters/anthropic.cjs"
+    },
+    "./adapters/openai": {
+      "types": "./dist/adapters/openai.d.ts",
+      "import": "./dist/adapters/openai.js",
+      "require": "./dist/adapters/openai.cjs"
+    },
+    "./adapters/ollama": {
+      "types": "./dist/adapters/ollama.d.ts",
+      "import": "./dist/adapters/ollama.js",
+      "require": "./dist/adapters/ollama.cjs"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "check": "tsc --noEmit",
+    "changeset": "changeset",
+    "changeset:status": "changeset status",
+    "typecheck": "tsc --noEmit",
+    "test": "bun test"
+  },
+  "devDependencies": {
+    "@changesets/cli": "^2.29.5",
+    "@types/bun": "latest",
+    "tsup": "^8.5.1",
+    "typescript": "^5.7.3"
+  },
+  "peerDependencies": {
+    "@anthropic-ai/sdk": ">=0.20.0"
+  },
+  "peerDependenciesMeta": {
+    "@anthropic-ai/sdk": {
+      "optional": true
+    }
+  }
+}

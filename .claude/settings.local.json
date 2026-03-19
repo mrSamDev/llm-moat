@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__plugin_context-mode_context-mode__ctx_batch_execute",
+      "Bash(bun test:*)",
+      "Bash(pnpm build:*)",
+      "Skill(plan-ceo-review)",
+      "Skill(plan-ceo-review:*)",
+      "Bash(node -e \":*)",
+      "Bash(bun -e \":*)",
+      "mcp__plugin_context-mode_context-mode__ctx_execute",
+      "Bash(~/.claude/skills/gstack/bin/gstack-review-log '{\"\"skill\"\":\"\"plan-eng-review\"\",\"\"timestamp\"\":\"\"2026-03-19T18:00:00Z\"\",\"\"status\"\":\"\"clean\"\",\"\"unresolved\"\":0,\"\"critical_gaps\"\":0,\"\"mode\"\":\"\"FULL_REVIEW\"\",\"\"commit\"\":\"\"unknown\"\"}')"
+    ]
+  }
+}
