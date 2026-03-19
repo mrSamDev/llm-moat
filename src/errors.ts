@@ -1,5 +1,8 @@
+/** Error thrown when input exceeds the configured or default maximum length. */
 export class InputTooLongError extends Error {
+  /** The number of characters in the rejected input. */
   readonly length: number;
+  /** The maximum allowed character count enforced for the input. */
   readonly maxLength: number;
 
   constructor(length: number, maxLength: number) {

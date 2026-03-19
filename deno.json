@@ -1,5 +1,6 @@
 {
   "name": "@mrsamdev/llm-moat",
+    "description": "TypeScript toolkit for prompt injection detection, sanitization, and LLM input security with rule-based and semantic classifier support.",
   "version": "0.2.0",
   "license": "MIT",
   "exports": {

@@ -1,3 +1,7 @@
+/**
+ * Streaming classification helpers for scanning long or incrementally received
+ * documents for prompt-injection patterns.
+ */
 import { classify } from "./classify";
 import { DEFAULT_MAX_INPUT_LENGTH, RISK_ORDER } from "./rules";
 import type { ClassificationResult, RiskLevel, StreamClassifier, StreamClassifierOptions } from "./types";

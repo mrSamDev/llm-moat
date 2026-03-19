@@ -2,10 +2,13 @@ import type { RiskLevel, RuleDefinition, RuleMatch, RuleSetJson } from "./types"
 
 export { defaultRuleSet } from "./default-rules";
 
+/** Default maximum input length enforced by classification and sanitization helpers. */
 export const DEFAULT_MAX_INPUT_LENGTH = 16384;
 
+/** Sort order used to rank rule matches from most to least severe. */
 export const RISK_ORDER: Record<RiskLevel, number> = { high: 0, medium: 1, low: 2 };
 
+/** Validates and returns a reusable rule set definition array. */
 export function createRuleSet(definitions: RuleDefinition[]): RuleDefinition[] {
   const seenIds = new Set<string>();
   for (const rule of definitions) {

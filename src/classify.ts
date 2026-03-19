@@ -1,3 +1,7 @@
+/**
+ * Classification APIs for rule-based prompt-injection detection with optional
+ * semantic model fallback.
+ */
 import { canonicalize } from "./canonicalize";
 import { guardInputLength } from "./errors";
 import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules";
@@ -132,6 +136,7 @@ function normalizeAdapterResult(
   };
 }
 
+/** Classifies input with the built-in or provided rule set. */
 export function classify(input: string, options?: ClassifierOptions): ClassificationResult {
   const start = Date.now();
   guardInputLength(input, options?.maxInputLength, DEFAULT_MAX_INPUT_LENGTH);
@@ -142,6 +147,7 @@ export function classify(input: string, options?: ClassifierOptions): Classifica
   return result;
 }
 
+/** Classifies input with rules first, then optionally consults a semantic adapter for low-risk results. */
 export async function classifyWithAdapter(
   input: string,
   options: AsyncClassifierOptions,

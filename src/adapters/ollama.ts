@@ -1,7 +1,11 @@
+/**
+ * Ollama adapter entrypoint for local semantic prompt-injection classification.
+ */
 import type { SemanticClassifierAdapter } from "../types";
 import { createOpenAICompatibleAdapter } from "./llm";
 import { DEFAULT_CLASSIFICATION_PROMPT } from "./shared";
 
+/** Options for creating an Ollama-backed semantic classifier adapter. */
 type OllamaAdapterOptions = {
   /**
    * The Ollama model to use. Must be pulled locally first (`ollama pull <model>`).

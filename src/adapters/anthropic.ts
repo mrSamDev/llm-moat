@@ -1,6 +1,10 @@
+/**
+ * Anthropic adapter entrypoint for semantic prompt-injection classification.
+ */
 import type { ClassificationResult, SemanticClassifierAdapter } from "../types";
 import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared";
 
+/** Minimal Anthropic client contract required by the adapter. */
 type AnthropicClient = {
   messages: {
     create(params: {
@@ -14,6 +18,7 @@ type AnthropicClient = {
   };
 };
 
+/** Options for creating an Anthropic-backed semantic classifier adapter. */
 type AnthropicAdapterOptions = {
   client: AnthropicClient;
   /** Default: "claude-haiku-4-5-20251001" */
@@ -22,6 +27,7 @@ type AnthropicAdapterOptions = {
   systemPrompt?: string;
 };
 
+/** Creates a semantic classifier adapter backed by the Anthropic Messages API. */
 export function createAnthropicAdapter(options: AnthropicAdapterOptions): SemanticClassifierAdapter {
   const model = options.model ?? "claude-haiku-4-5-20251001";
   const systemPrompt = options.systemPrompt ?? DEFAULT_CLASSIFICATION_PROMPT;

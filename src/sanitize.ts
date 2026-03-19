@@ -1,3 +1,7 @@
+/**
+ * Sanitization helpers for wrapping untrusted text and redacting content that
+ * matches prompt-injection rules.
+ */
 import { canonicalize } from "./canonicalize";
 import { guardInputLength } from "./errors";
 import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules";
@@ -11,6 +15,7 @@ function safeHook(fn: () => void): void {
   }
 }
 
+/** Wraps untrusted content in explicit boundary markers for downstream prompts. */
 export function labelUntrustedText(text: string, options?: TrustBoundaryOptions): string {
   const sourceLabel = options?.sourceLabel ?? "untrusted data";
   const instructionAuthority = options?.instructionAuthority ?? "none";
@@ -23,6 +28,7 @@ export function labelUntrustedText(text: string, options?: TrustBoundaryOptions)
   ].join("\n");
 }
 
+/** Redacts untrusted text when configured risk levels match the active rule set. */
 export function sanitizeUntrustedText(text: string, options?: SanitizationOptions): SanitizationResult {
   const start = Date.now();
   guardInputLength(text, options?.maxInputLength, DEFAULT_MAX_INPUT_LENGTH);

@@ -1,7 +1,11 @@
+/**
+ * OpenAI adapter entrypoint for semantic prompt-injection classification.
+ */
 import type { SemanticClassifierAdapter } from "../types";
 import { createOpenAICompatibleAdapter } from "./llm";
 import { DEFAULT_CLASSIFICATION_PROMPT } from "./shared";
 
+/** Options for creating an OpenAI semantic classifier adapter. */
 type OpenAIAdapterOptions = {
   apiKey: string;
   /** Default: "gpt-4o-mini" */

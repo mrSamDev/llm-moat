@@ -1,5 +1,7 @@
+/** Risk levels returned by the classifier and sanitization pipeline. */
 export type RiskLevel = "low" | "medium" | "high";
 
+/** Threat categories used to label prompt-injection and related abuse patterns. */
 export type ThreatCategory =
   | "direct-injection"
   | "role-escalation"
@@ -18,6 +20,7 @@ export type ThreatCategory =
   | "benign"
   | "custom";
 
+/** A rule-based detection definition made of regex patterns and a classification outcome. */
 export type RuleDefinition = {
   id: string;
   patterns: RegExp[];
@@ -26,6 +29,7 @@ export type RuleDefinition = {
   reason: string;
 };
 
+/** A normalized description of a rule that matched a canonicalized input. */
 export type RuleMatch = {
   id: string;
   risk: RiskLevel;
@@ -33,6 +37,7 @@ export type RuleMatch = {
   reason: string;
 };
 
+/** Final result returned by rule-based or semantic classification. */
 export type ClassificationResult = {
   risk: RiskLevel;
   category: ThreatCategory;
@@ -48,6 +53,7 @@ export type ClassificationResult = {
   errors?: string[];
 };
 
+/** Tunables for detecting injection attempts hidden at the tail of long inputs. */
 export type ContextExhaustionOptions = {
   minLength?: number;
   tailLength?: number;
@@ -57,6 +63,7 @@ export type ContextExhaustionOptions = {
 // Observability hooks
 // ---------------------------------------------------------------------------
 
+/** Timing and size metadata emitted by classification hooks. */
 export type ClassifyMeta = {
   /** Elapsed time from classify() entry to return, in milliseconds. */
   durationMs: number;
@@ -64,6 +71,7 @@ export type ClassifyMeta = {
   inputLength: number;
 };
 
+/** Metadata emitted for semantic adapter invocations or skips. */
 export type AdapterMeta = {
   /** Elapsed time of the adapter call, in milliseconds. 0 when skipped. */
   durationMs: number;
@@ -73,6 +81,7 @@ export type AdapterMeta = {
   error?: string;
 };
 
+/** Lifecycle hooks for synchronous and adapter-assisted classification. */
 export type ClassificationHooks = {
   /** Fired after every classify() call with the final result. */
   onClassify?: (result: ClassificationResult, meta: ClassifyMeta) => void;
@@ -80,6 +89,7 @@ export type ClassificationHooks = {
   onAdapterCall?: (result: ClassificationResult, meta: AdapterMeta) => void;
 };
 
+/** Per-chunk metadata emitted by the streaming classifier. */
 export type StreamChunkMeta = {
   /** Zero-based index of this chunk since the last reset(). */
   chunkIndex: number;
@@ -89,6 +99,7 @@ export type StreamChunkMeta = {
   earlyResult: ClassificationResult | null;
 };
 
+/** Lifecycle hooks for streaming classification. */
 export type StreamHooks = {
   /** Fired after each feed() call. */
   onChunk?: (meta: StreamChunkMeta) => void;
@@ -96,6 +107,7 @@ export type StreamHooks = {
   onFlush?: (result: ClassificationResult, meta: { totalDurationMs: number }) => void;
 };
 
+/** Timing metadata emitted by sanitization hooks. */
 export type SanitizeMeta = {
   /** Elapsed time of the sanitizeUntrustedText() call, in milliseconds. */
   durationMs: number;
@@ -103,6 +115,7 @@ export type SanitizeMeta = {
   inputLength: number;
 };
 
+/** Lifecycle hooks for the sanitization pipeline. */
 export type SanitizationHooks = {
   /** Fired after every sanitizeUntrustedText() call with the final result. */
   onSanitize?: (result: SanitizationResult, meta: SanitizeMeta) => void;
@@ -112,6 +125,7 @@ export type SanitizationHooks = {
 // Options
 // ---------------------------------------------------------------------------
 
+/** Options for the synchronous rule-based classifier. */
 export type ClassifierOptions = {
   ruleSet?: RuleDefinition[];
   contextExhaustion?: ContextExhaustionOptions | false;
@@ -125,11 +139,13 @@ export type ClassifierOptions = {
   hooks?: ClassificationHooks;
 };
 
+/** Options for classification that may fall back to a semantic adapter. */
 export type AsyncClassifierOptions = ClassifierOptions & {
   adapter: SemanticClassifierAdapter;
   fallbackToRulesOnError?: boolean;
 };
 
+/** Options for incrementally classifying a document as chunks arrive. */
 export type StreamClassifierOptions = ClassifierOptions & {
   /**
    * Risk level at which the stream classifier emits a result immediately
@@ -140,6 +156,7 @@ export type StreamClassifierOptions = ClassifierOptions & {
   hooks?: StreamHooks;
 };
 
+/** Reusable stateful classifier for chunked input streams. */
 export type StreamClassifier = {
   /** Feed a chunk of text. Returns a ClassificationResult immediately if a threat at or above earlyExitRisk is found, otherwise null. */
   feed(chunk: string): ClassificationResult | null;
@@ -149,16 +166,19 @@ export type StreamClassifier = {
   reset(): void;
 };
 
+/** Contract implemented by semantic model adapters used by `classifyWithAdapter()`. */
 export type SemanticClassifierAdapter = {
   classify: (canonicalInput: string) => Promise<Partial<ClassificationResult> | null>;
 };
 
+/** Labels used when wrapping untrusted content with explicit trust-boundary markers. */
 export type TrustBoundaryOptions = {
   sourceLabel?: string;
   instructionAuthority?: string;
   emptyPlaceholder?: string;
 };
 
+/** Options for redacting or passing through untrusted text. */
 export type SanitizationOptions = {
   redactionText?: string;
   rules?: RuleDefinition[];
@@ -168,6 +188,7 @@ export type SanitizationOptions = {
   hooks?: SanitizationHooks;
 };
 
+/** Result returned by `sanitizeUntrustedText()`. */
 export type SanitizationResult = {
   text: string;
   redacted: boolean;

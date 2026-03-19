@@ -1,3 +1,7 @@
+/**
+ * Canonicalization utilities for normalizing untrusted text before rule
+ * matching and downstream semantic classification.
+ */
 function decodeEscapes(input: string): string {
   return input
     .replace(/\\u([0-9a-fA-F]{4})/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
@@ -29,6 +33,7 @@ function normalizeWhitespace(input: string): string {
   return input.replace(/[\t\r\n]+/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
+/** Normalizes text by decoding escapes/entities, stripping wrappers, and lowercasing. */
 export function canonicalize(input: string): string {
   return normalizeWhitespace(stripInvisible(stripWrappers(decodeEntities(decodeEscapes(input))))).toLowerCase();
 }
