@@ -1,0 +1,35 @@
+{
+  "name": "@your-scope/llm-moat",
+  "version": "0.2.0",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./adapters/llm": "./src/adapters/llm.ts",
+    "./adapters/anthropic": "./src/adapters/anthropic.ts",
+    "./adapters/openai": "./src/adapters/openai.ts",
+    "./adapters/ollama": "./src/adapters/ollama.ts"
+  },
+  "publish": {
+    "include": [
+      "src/**/*.ts",
+      "README.md",
+      "LICENSE"
+    ],
+    "exclude": [
+      "dist",
+      "docs",
+      "tests"
+    ]
+  },
+  "tasks": {
+    "check": "deno check src/index.ts src/adapters/llm.ts src/adapters/anthropic.ts src/adapters/openai.ts src/adapters/ollama.ts"
+  },
+  "compilerOptions": {
+    "lib": [
+      "ES2020",
+      "DOM",
+      "DOM.Iterable"
+    ],
+    "strict": true
+  }
+}
