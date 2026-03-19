@@ -54,6 +54,8 @@
   "scripts": {
     "build": "tsup",
     "check": "tsc --noEmit",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check",
     "changeset": "changeset",
     "changeset:status": "changeset status",
     "typecheck": "tsc --noEmit",
@@ -62,6 +64,7 @@
   "devDependencies": {
     "@changesets/cli": "^2.29.5",
     "@types/bun": "latest",
+    "oxfmt": "^0.41.0",
     "tsup": "^8.5.1",
     "typescript": "^5.7.3"
   },
