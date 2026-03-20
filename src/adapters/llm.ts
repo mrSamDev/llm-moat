@@ -2,8 +2,8 @@
  * OpenAI-compatible semantic classifier adapter primitives for providers that
  * expose a `/chat/completions` style API.
  */
-import type { ClassificationResult, SemanticClassifierAdapter } from "../types";
-import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared";
+import type { ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
+import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared.ts";
 
 /** Configuration for any OpenAI-compatible semantic classifier provider. */
 type OpenAICompatibleAdapterOptions = {

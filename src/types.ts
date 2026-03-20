@@ -1,6 +1,29 @@
 /** Risk levels returned by the classifier and sanitization pipeline. */
 export type RiskLevel = "low" | "medium" | "high";
 
+/** Valid risk level values for runtime validation. */
+export const VALID_RISKS = new Set<string>(["low", "medium", "high"]);
+
+/** Valid threat category values for runtime validation. */
+export const VALID_CATEGORIES = new Set<string>([
+  "direct-injection",
+  "role-escalation",
+  "tool-abuse",
+  "stored-injection",
+  "role-confusion",
+  "obfuscation",
+  "context-exhaustion",
+  "translation-attack",
+  "indirect-injection",
+  "social-engineering",
+  "prompt-leaking",
+  "jailbreak",
+  "data-exfiltration",
+  "excessive-agency",
+  "benign",
+  "custom",
+]);
+
 /** Threat categories used to label prompt-injection and related abuse patterns. */
 export type ThreatCategory =
   | "direct-injection"

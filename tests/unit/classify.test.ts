@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { classify, classifyWithAdapter } from "../../src/classify";
+import { sanitizeUntrustedText } from "../../src/sanitize";
 import { InputTooLongError } from "../../src/errors";
 import type { ClassifyTelemetryEvent, RuleDefinition } from "../../src/types";
 
@@ -475,5 +476,23 @@ describe("classify — onTelemetry hook", () => {
     expect(() =>
       classify("hello", { hooks: { onTelemetry: () => { throw new Error("telemetry blew up"); } } }),
     ).not.toThrow();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Type guards
+// ---------------------------------------------------------------------------
+
+describe("type guards", () => {
+  test("classify(null) throws TypeError", () => {
+    expect(() => classify(null as unknown as string)).toThrow(TypeError);
+  });
+
+  test("classify(undefined) throws TypeError", () => {
+    expect(() => classify(undefined as unknown as string)).toThrow(TypeError);
+  });
+
+  test("sanitizeUntrustedText(null) throws TypeError", () => {
+    expect(() => sanitizeUntrustedText(null as unknown as string)).toThrow(TypeError);
   });
 });

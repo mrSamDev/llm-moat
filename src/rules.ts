@@ -1,6 +1,7 @@
-import type { RiskLevel, RuleDefinition, RuleMatch, RuleSetJson } from "./types";
+import type { RiskLevel, RuleDefinition, RuleMatch, RuleSetJson } from "./types.ts";
+import { VALID_CATEGORIES, VALID_RISKS } from "./types.ts";
 
-export { defaultRuleSet } from "./default-rules";
+export { defaultRuleSet } from "./default-rules.ts";
 
 /** Default maximum input length enforced by classification and sanitization helpers. */
 export const DEFAULT_MAX_INPUT_LENGTH = 16384;
@@ -63,12 +64,15 @@ export function loadRuleSetFromJson(json: string | RuleSetJson): RuleDefinition[
 
   const definitions = parsed.rules.map((rule, i) => {
     const loc = `rule at index ${i}`;
+    if (rule == null) throw new Error(`loadRuleSetFromJson: ${loc} is null or undefined`);
     if (!rule.id) throw new Error(`loadRuleSetFromJson: ${loc} missing "id"`);
     if (!Array.isArray(rule.patterns) || rule.patterns.length === 0) {
       throw new Error(`loadRuleSetFromJson: rule "${rule.id}" missing "patterns" array`);
     }
     if (!rule.risk) throw new Error(`loadRuleSetFromJson: rule "${rule.id}" missing "risk"`);
+    if (!VALID_RISKS.has(rule.risk)) throw new Error(`loadRuleSetFromJson: rule "${rule.id}" has invalid risk "${rule.risk}"`);
     if (!rule.category) throw new Error(`loadRuleSetFromJson: rule "${rule.id}" missing "category"`);
+    if (!VALID_CATEGORIES.has(rule.category)) throw new Error(`loadRuleSetFromJson: rule "${rule.id}" has invalid category "${rule.category}"`);
     if (!rule.reason) throw new Error(`loadRuleSetFromJson: rule "${rule.id}" missing "reason"`);
 
     const flags = rule.flags ?? "";
@@ -96,6 +100,74 @@ export function loadRuleSetFromJson(json: string | RuleSetJson): RuleDefinition[
   });
 
   return createRuleSet(definitions);
+}
+
+const SRI_ALGORITHMS: Record<string, string> = {
+  sha256: "SHA-256",
+  sha384: "SHA-384",
+  sha512: "SHA-512",
+};
+
+function parseSriHash(integrity: string): { algorithm: string; expected: string } {
+  const match = integrity.match(/^(sha\d+)-([A-Za-z0-9+/]+=*)$/);
+  if (!match) throw new Error(`loadRuleSetFromUrl: malformed integrity string`);
+  const [, prefix, expected] = match;
+  const algorithm = SRI_ALGORITHMS[prefix];
+  if (!algorithm) throw new Error(`loadRuleSetFromUrl: unsupported algorithm ${prefix}`);
+  return { algorithm, expected };
+}
+
+function bufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
+
+/**
+ * Fetch a rule set from a URL with SRI integrity verification.
+ * Requires Node >= 18 (globalThis.crypto.subtle).
+ * Throws descriptively on network errors, integrity mismatches, and invalid rule sets.
+ */
+export async function loadRuleSetFromUrl(
+  url: string,
+  opts: { integrity: string; signal?: AbortSignal },
+): Promise<RuleDefinition[]> {
+  if (!opts.integrity) throw new Error("loadRuleSetFromUrl: integrity is required");
+  const { algorithm, expected } = parseSriHash(opts.integrity);
+
+  let res: Response;
+  try {
+    res = await fetch(url, { signal: opts.signal });
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`loadRuleSetFromUrl: network error: ${msg}`);
+  }
+
+  if (!res.ok) throw new Error(`loadRuleSetFromUrl: HTTP ${res.status} from ${url}`);
+
+  const buffer = await res.arrayBuffer();
+  const hashBuffer = await globalThis.crypto.subtle.digest(algorithm, buffer);
+  const actual = bufferToBase64(hashBuffer);
+  if (actual !== expected) throw new Error("loadRuleSetFromUrl: integrity mismatch");
+
+  let text: string;
+  try {
+    text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+  } catch {
+    throw new Error("loadRuleSetFromUrl: response is not valid UTF-8");
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    throw new Error("loadRuleSetFromUrl: response is not valid JSON");
+  }
+
+  return loadRuleSetFromJson(parsed as Parameters<typeof loadRuleSetFromJson>[0]);
 }
 
 /**

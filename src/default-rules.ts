@@ -1,4 +1,4 @@
-import type { RuleDefinition } from "./types";
+import type { RuleDefinition } from "./types.ts";
 
 export const defaultRuleSet: RuleDefinition[] = [
   {

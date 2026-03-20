@@ -2,9 +2,9 @@
  * Classification APIs for rule-based prompt-injection detection with optional
  * semantic model fallback.
  */
-import { canonicalize } from "./canonicalize";
-import { guardInputLength } from "./errors";
-import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules";
+import { canonicalize } from "./canonicalize.ts";
+import { guardInputLength } from "./errors.ts";
+import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules.ts";
 import type {
   AsyncClassifierOptions,
   ClassificationResult,
@@ -13,7 +13,7 @@ import type {
   RiskLevel,
   RuleDefinition,
   RuleMatch,
-} from "./types";
+} from "./types.ts";
 
 function getRules(options?: ClassifierOptions): RuleDefinition[] {
   return options?.ruleSet ?? defaultRuleSet;
@@ -139,6 +139,7 @@ function normalizeAdapterResult(
 
 /** Classifies input with the built-in or provided rule set. */
 export function classify(input: string, options?: ClassifierOptions): ClassificationResult {
+  if (typeof input !== "string") throw new TypeError("classify: input must be a string");
   const start = Date.now();
   guardInputLength(input, options?.maxInputLength, DEFAULT_MAX_INPUT_LENGTH);
   const canonicalInput = canonicalize(input);
@@ -168,6 +169,7 @@ export async function classifyWithAdapter(
   input: string,
   options: AsyncClassifierOptions,
 ): Promise<ClassificationResult> {
+  if (typeof input !== "string") throw new TypeError("classify: input must be a string");
   const { adapter, ...classifierOptions } = options;
   const syncResult = classify(input, classifierOptions);
 

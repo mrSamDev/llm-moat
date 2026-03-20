@@ -1,9 +1,9 @@
 /**
  * OpenAI adapter entrypoint for semantic prompt-injection classification.
  */
-import type { SemanticClassifierAdapter } from "../types";
-import { createOpenAICompatibleAdapter } from "./llm";
-import { DEFAULT_CLASSIFICATION_PROMPT } from "./shared";
+import type { SemanticClassifierAdapter } from "../types.ts";
+import { createOpenAICompatibleAdapter } from "./llm.ts";
+import { DEFAULT_CLASSIFICATION_PROMPT } from "./shared.ts";
 
 /** Options for creating an OpenAI semantic classifier adapter. */
 type OpenAIAdapterOptions = {
