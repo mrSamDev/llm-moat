@@ -1,6 +1,6 @@
 {
   "name": "llm-moat",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "TypeScript toolkit for prompt injection detection, sanitization, and LLM input security with rule-based and semantic classifier support.",
   "keywords": [
     "prompt-injection",
