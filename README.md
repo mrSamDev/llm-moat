@@ -2,7 +2,7 @@
 
 Zero-dependency TypeScript toolkit for detecting and sanitizing prompt injection in LLM applications.
 
-**v0.2.0** — multi-match classification · confidence scores · streaming classifier · portable JSON rule format · ReDoS-safe patterns · input length guard
+**v0.2.2** — multi-match classification · confidence scores · streaming classifier · portable JSON rule format · ReDoS-safe patterns · input length guard · telemetry hooks · remote rule sets
 
 ---
 
@@ -203,7 +203,7 @@ Share, store, and load rule sets as JSON — useful for CDN-hosted community rul
 import { loadRuleSetFromJson, exportRuleSetToJson, defaultRuleSet } from "llm-moat";
 
 // Export the built-in rules to JSON
-const json = exportRuleSetToJson(defaultRuleSet, { name: "default", version: "0.2.0" });
+const json = exportRuleSetToJson(defaultRuleSet, { name: "default", version: "0.2.2" });
 
 // Load from JSON string (validates all patterns, IDs, and flags at load time)
 const rules = loadRuleSetFromJson(json);
@@ -215,7 +215,65 @@ const communityRules = loadRuleSetFromJson(await response.json());
 
 The loader throws descriptively if a rule is missing required fields, uses an invalid regex, has a duplicate ID, or uses the `g` flag (which causes stateful bugs with `.test()`).
 
-### 8. Input length guard
+### 8. Remote rule set loading with `loadRuleSetFromUrl()`
+
+Fetch a rule set from a URL with optional SRI integrity verification — useful for CDN-hosted community packs:
+
+```ts
+import { classifyWithAdapter } from "llm-moat";
+import { loadRuleSetFromUrl } from "llm-moat";
+
+const rules = await loadRuleSetFromUrl(
+  "https://example.com/rules/community-rules.json",
+  {
+    // SRI hash — sha256, sha384, or sha512. Throws if the payload doesn't match.
+    integrity: "sha256-abc123...",
+  },
+);
+
+const result = classify(input, { ruleSet: rules });
+```
+
+Throws descriptively on network errors, HTTP failures, integrity mismatches, invalid UTF-8, and invalid JSON. Requires Node >= 18 (`globalThis.crypto.subtle`).
+
+### 9. Telemetry hooks with `onTelemetry`
+
+Add an `onTelemetry` callback to any operation to capture timing, match data, and risk verdicts without instrumenting your own wrappers:
+
+```ts
+import { classify, sanitizeUntrustedText } from "llm-moat";
+
+classify(input, {
+  onTelemetry(event) {
+    console.log(event.durationMs);     // how long classification took
+    console.log(event.risk);           // verdict
+    console.log(event.confidence);     // 0.0–1.0
+    console.log(event.matchedRuleIds); // which rules fired
+  },
+});
+
+sanitizeUntrustedText(input, {
+  onTelemetry(event) {
+    myMetrics.record("sanitize", event);
+  },
+});
+```
+
+The `onTelemetry` callback fires synchronously after each operation. The event shape:
+
+```ts
+type TelemetryEvent = {
+  timestamp: number;       // Date.now() at completion
+  durationMs: number;      // wall time in ms
+  inputLength: number;     // chars before canonicalization
+  risk: RiskLevel;
+  category: ThreatCategory;
+  confidence: number;
+  matchedRuleIds: string[];
+};
+```
+
+### 10. Input length guard
 
 `llm-moat` enforces a 16KB default maximum on all entry points. Attacker-controlled input with no size cap can cause slow processing. The guard throws before any regex runs:
 
@@ -260,6 +318,7 @@ function classify(input: string, options?: ClassifierOptions): ClassificationRes
 | `contextExhaustion` | `ContextExhaustionOptions \| false` | enabled | Detect injection buried at the tail of long inputs. `false` to disable. |
 | `contextExhaustion.minLength` | `number` | `400` | Minimum input length before context exhaustion check runs |
 | `contextExhaustion.tailLength` | `number` | `200` | Number of tail characters to check for high-risk patterns |
+| `onTelemetry` | `(event: ClassifyTelemetryEvent) => void` | — | Callback fired after classification with timing, risk, confidence, and matched rule IDs |
 
 **Returns: `ClassificationResult`**
 
@@ -299,6 +358,7 @@ function classifyWithAdapter(
 |---|---|---|---|
 | `adapter` | `SemanticClassifierAdapter` | required | The adapter to use for semantic classification |
 | `fallbackToRulesOnError` | `boolean` | `true` | If `false`, re-throws adapter errors instead of falling back |
+| `onTelemetry` | `(event: ClassifyTelemetryEvent) => void` | — | Same as `ClassifierOptions.onTelemetry` |
 
 ---
 
@@ -316,6 +376,7 @@ function sanitizeUntrustedText(text: string, options?: SanitizationOptions): San
 | `redactionText` | `string` | `"[content redacted by input filter]"` | Replacement text for redacted content |
 | `rules` | `RuleDefinition[]` | built-in rules | Custom rule set |
 | `maxInputLength` | `number \| false` | `16384` | Max input chars before `InputTooLongError` |
+| `onTelemetry` | `(event: SanitizeTelemetryEvent) => void` | — | Callback fired after sanitization with timing, risk, and matched rule IDs |
 
 **Returns: `SanitizationResult`**
 
@@ -378,6 +439,7 @@ function createStreamClassifier(options?: StreamClassifierOptions): StreamClassi
 | `maxInputLength` | `number \| false` | `16384` | Maximum accumulated characters. Truncates and classifies at the limit. |
 | `ruleSet` | `RuleDefinition[]` | built-in rules | Rule set to use |
 | `contextExhaustion` | `ContextExhaustionOptions \| false` | enabled | Same as `classify` |
+| `onTelemetry` | `(event: StreamTelemetryEvent) => void` | — | Callback fired on `flush()` with timing, risk, and matched rule IDs |
 
 ```ts
 type StreamClassifier = {
@@ -405,6 +467,26 @@ const matches = findAllRuleMatches(
 //   { id: "indirect-injection", risk: "medium", ... },
 // ]
 ```
+
+---
+
+### `loadRuleSetFromUrl(url, options?)`
+
+Fetches a JSON rule set from a URL with optional SRI integrity verification.
+
+```ts
+function loadRuleSetFromUrl(
+  url: string,
+  options?: { integrity?: string; signal?: AbortSignal },
+): Promise<RuleDefinition[]>
+```
+
+| Option | Type | Description |
+|---|---|---|
+| `integrity` | `string` | SRI hash (`sha256-...`, `sha384-...`, `sha512-...`). Throws if the response body doesn't match. |
+| `signal` | `AbortSignal` | Optional abort signal to cancel the fetch. |
+
+Throws on network errors, non-2xx HTTP status, integrity mismatch, invalid UTF-8, or invalid JSON. Requires Node >= 18 / `globalThis.crypto.subtle`.
 
 ---
 
@@ -676,9 +758,20 @@ import type {
   TrustBoundaryOptions,
   ContextExhaustionOptions,
   RuleSetJson,
+  // Telemetry
+  TelemetryEvent,
+  ClassifyTelemetryEvent,
+  SanitizeTelemetryEvent,
+  StreamTelemetryEvent,
 } from "llm-moat";
 
-import { InputTooLongError, DEFAULT_MAX_INPUT_LENGTH } from "llm-moat";
+import {
+  InputTooLongError,
+  DEFAULT_MAX_INPUT_LENGTH,
+  // Runtime validation constants
+  VALID_RISKS,
+  VALID_CATEGORIES,
+} from "llm-moat";
 ```
 
 ---
