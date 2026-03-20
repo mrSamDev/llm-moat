@@ -209,6 +209,24 @@ describe("loadRuleSetFromJson / exportRuleSetToJson", () => {
     ).toThrow(/duplicate rule id/);
   });
 
+  test("throws on null rule entry", () => {
+    expect(() =>
+      loadRuleSetFromJson({ rules: [null as unknown as { id: string; patterns: string[]; risk: string; category: string; reason: string }] }),
+    ).toThrow(/null or undefined/);
+  });
+
+  test("throws on invalid risk value", () => {
+    expect(() =>
+      loadRuleSetFromJson({ rules: [{ id: "r", patterns: ["x"], risk: "critical" as "high", category: "custom", reason: "x" }] }),
+    ).toThrow(/invalid risk/);
+  });
+
+  test("throws on invalid category value", () => {
+    expect(() =>
+      loadRuleSetFromJson({ rules: [{ id: "r", patterns: ["x"], risk: "high", category: "unknown" as "custom", reason: "x" }] }),
+    ).toThrow(/invalid category/);
+  });
+
   test("exported JSON can be loaded back and match correctly", () => {
     const original = loadRuleSetFromJson(sampleJson);
     const exported = exportRuleSetToJson(original);

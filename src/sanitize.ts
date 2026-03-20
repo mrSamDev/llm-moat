@@ -2,10 +2,10 @@
  * Sanitization helpers for wrapping untrusted text and redacting content that
  * matches prompt-injection rules.
  */
-import { canonicalize } from "./canonicalize";
-import { guardInputLength } from "./errors";
-import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules";
-import type { SanitizationOptions, SanitizationResult, SanitizeTelemetryEvent, TrustBoundaryOptions } from "./types";
+import { canonicalize } from "./canonicalize.ts";
+import { guardInputLength } from "./errors.ts";
+import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules.ts";
+import type { SanitizationOptions, SanitizationResult, SanitizeTelemetryEvent, TrustBoundaryOptions } from "./types.ts";
 
 function safeHook(fn: () => void): void {
   try {
@@ -30,6 +30,7 @@ export function labelUntrustedText(text: string, options?: TrustBoundaryOptions)
 
 /** Redacts untrusted text when configured risk levels match the active rule set. */
 export function sanitizeUntrustedText(text: string, options?: SanitizationOptions): SanitizationResult {
+  if (typeof text !== "string") throw new TypeError("sanitizeUntrustedText: input must be a string");
   const start = Date.now();
   guardInputLength(text, options?.maxInputLength, DEFAULT_MAX_INPUT_LENGTH);
 

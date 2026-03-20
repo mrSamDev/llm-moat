@@ -1,25 +1,6 @@
-import type { ClassificationResult, ThreatCategory } from "../types";
-
-export const VALID_RISKS = new Set(["low", "medium", "high"]);
-
-export const VALID_CATEGORIES = new Set<ThreatCategory>([
-  "direct-injection",
-  "role-escalation",
-  "tool-abuse",
-  "stored-injection",
-  "role-confusion",
-  "obfuscation",
-  "context-exhaustion",
-  "translation-attack",
-  "indirect-injection",
-  "social-engineering",
-  "prompt-leaking",
-  "jailbreak",
-  "data-exfiltration",
-  "excessive-agency",
-  "benign",
-  "custom",
-]);
+import { VALID_CATEGORIES, VALID_RISKS } from "../types.ts";
+import type { ClassificationResult, ThreatCategory } from "../types.ts";
+export { VALID_CATEGORIES, VALID_RISKS } from "../types.ts";
 
 /**
  * Default system prompt used by all built-in adapters.
