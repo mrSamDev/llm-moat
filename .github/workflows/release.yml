@@ -57,5 +57,8 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
+      - name: JSR Dry Run
+        run: pnpx jsr publish --dry-run
+
       - name: Publish to JSR
         run: npx jsr publish
