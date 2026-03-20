@@ -1,8 +1,8 @@
 /**
  * Anthropic adapter entrypoint for semantic prompt-injection classification.
  */
-import type { ClassificationResult, SemanticClassifierAdapter } from "../types";
-import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared";
+import type { ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
+import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared.ts";
 
 /** Minimal Anthropic client contract required by the adapter. */
 type AnthropicClient = {

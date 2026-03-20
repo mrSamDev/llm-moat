@@ -2,9 +2,9 @@
  * Streaming classification helpers for scanning long or incrementally received
  * documents for prompt-injection patterns.
  */
-import { classify } from "./classify";
-import { DEFAULT_MAX_INPUT_LENGTH, RISK_ORDER } from "./rules";
-import type { ClassificationResult, RiskLevel, StreamClassifier, StreamClassifierOptions, StreamTelemetryEvent } from "./types";
+import { classify } from "./classify.ts";
+import { DEFAULT_MAX_INPUT_LENGTH, RISK_ORDER } from "./rules.ts";
+import type { ClassificationResult, RiskLevel, StreamClassifier, StreamClassifierOptions, StreamTelemetryEvent } from "./types.ts";
 
 function safeHook(fn: () => void): void {
   try {

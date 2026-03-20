@@ -1,11 +1,34 @@
 # Changelog
 
-All notable changes to `prompt-defense` are documented here.
+All notable changes to `llm-moat` are documented here.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.2.0] — Unreleased
+## [0.2.2]
+
+### Added
+
+**Remote rule set loading**
+- `loadRuleSetFromUrl(url, { integrity, signal? })` — fetch a rule set from a URL with SRI integrity verification (sha256/sha384/sha512). Throws descriptively on network errors, HTTP failures, integrity mismatches, and invalid UTF-8 or JSON. Requires Node >= 18 (`globalThis.crypto.subtle`).
+
+**Telemetry hooks**
+- `ClassifyTelemetryEvent`, `SanitizeTelemetryEvent`, `StreamTelemetryEvent`, `TelemetryEvent` — exported types for telemetry callbacks.
+- `onTelemetry` option on `ClassifierOptions`, `SanitizationOptions`, and `StreamClassifierOptions` — fires after each operation with `timestamp`, `durationMs`, `inputLength`, `risk`, `category`, `confidence`, and `matchedRuleIds`.
+
+**Runtime validation constants**
+- `VALID_RISKS` and `VALID_CATEGORIES` exported from `types.ts` for use in custom validation logic.
+
+### Changed
+
+- `classify()` and `classifyWithAdapter()` throw `TypeError` if input is not a string.
+- `sanitizeUntrustedText()` throws `TypeError` if input is not a string.
+- `loadRuleSetFromJson()` now validates null rules, invalid `risk` values, and invalid `category` values — throws descriptively instead of silently producing bad rule sets.
+- All internal imports use explicit `.ts` extensions for Deno/JSR compatibility.
+
+---
+
+## [0.2.0]
 
 ### Added
 
@@ -71,7 +94,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ---
 
-## [0.1.0] — Unreleased (baseline)
+## [0.1.0]
 
 Initial implementation extracted from internal monorepo.
 

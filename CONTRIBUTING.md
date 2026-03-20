@@ -32,6 +32,15 @@ pnpm run build
 - Prefer small, composable functions over broad rewrites.
 - Keep regex and rule changes ReDoS-safe and explain non-obvious detection logic.
 
+## Rule contributions
+
+Use the issue templates to submit evasion reports or rule proposals:
+
+- [New evasion technique](.github/ISSUE_TEMPLATE/evasion-technique.md) — attack string that bypasses current rules
+- [Rule suggestion](.github/ISSUE_TEMPLATE/rule-suggestion.md) — new detection pattern or improvement
+
+Structured submissions make it much easier to evaluate and act on contributions.
+
 ## Reporting bugs
 
 Include:
