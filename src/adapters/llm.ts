@@ -2,7 +2,7 @@
  * OpenAI-compatible semantic classifier adapter primitives for providers that
  * expose a `/chat/completions` style API.
  */
-import type { ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
+import type { AdapterClassificationResult, ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
 import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared.ts";
 
 /** Configuration for any OpenAI-compatible semantic classifier provider. */
@@ -37,7 +37,7 @@ export function createOpenAICompatibleAdapter(
   const systemPrompt = options.systemPrompt ?? DEFAULT_CLASSIFICATION_PROMPT;
 
   return {
-    async classify(canonicalInput: string): Promise<Partial<ClassificationResult> | null> {
+    async classify(canonicalInput: string): Promise<AdapterClassificationResult | null> {
       const response = await fetch(`${options.baseURL ?? "https://api.openai.com/v1"}/chat/completions`, {
         method: "POST",
         headers: {

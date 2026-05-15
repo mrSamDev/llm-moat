@@ -1,5 +1,5 @@
 import { VALID_CATEGORIES, VALID_RISKS } from "../types.ts";
-import type { ClassificationResult, ThreatCategory } from "../types.ts";
+import type { AdapterClassificationResult, ThreatCategory } from "../types.ts";
 export { VALID_CATEGORIES, VALID_RISKS } from "../types.ts";
 
 /**
@@ -23,14 +23,14 @@ Return only the JSON object — no markdown, no explanation, no wrapper.`;
 
 /**
  * Parse and validate a JSON classifier response from any adapter.
- * Returns a partial ClassificationResult on success, null if the payload
+ * Returns an AdapterClassificationResult on success, null if the payload
  * is missing required fields or contains invalid values.
  */
-export function parseClassifierJson(text: string): Partial<ClassificationResult> | null {
+export function parseClassifierJson(text: string): AdapterClassificationResult | null {
   const jsonMatch = text.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
 
-  let payload: { risk?: string; category?: string; reason?: string };
+  let payload: { risk?: string; category?: string; reason?: string; confidence?: number };
   try {
     payload = JSON.parse(jsonMatch[0]) as typeof payload;
   } catch {
@@ -42,8 +42,9 @@ export function parseClassifierJson(text: string): Partial<ClassificationResult>
   }
 
   return {
-    risk: payload.risk as ClassificationResult["risk"],
+    risk: payload.risk as AdapterClassificationResult["risk"],
     category: payload.category as ThreatCategory,
     reason: payload.reason,
+    confidence: payload.confidence,
   };
 }

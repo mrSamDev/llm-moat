@@ -1,7 +1,7 @@
 /**
  * Anthropic adapter entrypoint for semantic prompt-injection classification.
  */
-import type { ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
+import type { AdapterClassificationResult, ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
 import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared.ts";
 
 /** Minimal Anthropic client contract required by the adapter. */
@@ -33,7 +33,7 @@ export function createAnthropicAdapter(options: AnthropicAdapterOptions): Semant
   const systemPrompt = options.systemPrompt ?? DEFAULT_CLASSIFICATION_PROMPT;
 
   return {
-    async classify(canonicalInput: string): Promise<Partial<ClassificationResult> | null> {
+    async classify(canonicalInput: string): Promise<AdapterClassificationResult | null> {
       const response = await options.client.messages.create({
         model,
         max_tokens: 256,

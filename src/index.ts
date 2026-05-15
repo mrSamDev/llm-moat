@@ -9,3 +9,4 @@ export * from "./rules.ts";
 export * from "./classify.ts";
 export * from "./sanitize.ts";
 export * from "./stream.ts";
+export * from "./cache.ts";

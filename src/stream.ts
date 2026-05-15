@@ -27,10 +27,12 @@ function safeHook(fn: () => void): void {
  * Handles cross-chunk patterns by accumulating the full text rather than
  * processing chunks independently.
  *
- * Performance note: each feed() re-classifies the full accumulated buffer from
+ * ⚠️ Performance note: each feed() re-classifies the full accumulated buffer from
  * the start (O(n²) total work for a clean document). For large documents without
- * early exit, prefer using classify() directly on the complete text, or feed
- * larger chunks to reduce the number of passes.
+ * early exit, prefer:
+ *   - Using classify() directly on the complete text
+ *   - Feeding larger chunks to reduce the number of passes
+ *   - Using feedBatch() for bulk processing
  *
  * Example:
  *   const scanner = createStreamClassifier();

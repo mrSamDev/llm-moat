@@ -72,7 +72,10 @@ export type ClassificationResult = {
   matchedRuleIds: string[];
   /** 0.0–1.0. Derived from match count and risk levels for rule-based results; adapter-provided for semantic results. */
   confidence: number;
+  /** Canonicalized input used for matching. */
   canonicalInput: string;
+  /** Original raw input for forensic analysis. */
+  rawInput: string;
   errors?: string[];
 };
 
@@ -204,6 +207,8 @@ export type ClassifierOptions = {
    * Default: 16384 (16KB).
    */
   maxInputLength?: number | false;
+  /** Canonicalization options. Default: { normalization: "NFC" } */
+  canonicalize?: import("./canonicalize.ts").CanonicalizeOptions;
   /** Observability hooks. All callbacks are best-effort — errors inside hooks are swallowed. */
   hooks?: ClassificationHooks;
 };
@@ -212,6 +217,20 @@ export type ClassifierOptions = {
 export type AsyncClassifierOptions = ClassifierOptions & {
   adapter: SemanticClassifierAdapter;
   fallbackToRulesOnError?: boolean;
+  /** Enable caching of adapter results. Default: false */
+  cache?: {
+    /** Maximum number of entries to cache. Default: 1000 */
+    maxEntries?: number;
+    /** TTL in milliseconds. Default: 5 minutes */
+    ttlMs?: number;
+  };
+  /** Circuit breaker configuration. Disabled if not set. */
+  circuitBreaker?: {
+    /** Number of failures before opening circuit. Default: 5 */
+    failureThreshold?: number;
+    /** Time in ms before attempting reset. Default: 30 seconds */
+    resetTimeoutMs?: number;
+  };
 };
 
 /** Options for incrementally classifying a document as chunks arrive. */
@@ -235,9 +254,23 @@ export type StreamClassifier = {
   reset(): void;
 };
 
+/** Classification result returned by semantic adapters. Lighter weight than full ClassificationResult. */
+export type AdapterClassificationResult = {
+  risk: RiskLevel;
+  category: ThreatCategory;
+  reason?: string;
+  confidence?: number;
+  /** Optional rule matches if adapter provides them. */
+  matches?: RuleMatch[];
+  /** Optional matched rule IDs if adapter provides them. */
+  matchedRuleIds?: string[];
+  /** Optional errors from adapter. */
+  errors?: string[];
+};
+
 /** Contract implemented by semantic model adapters used by `classifyWithAdapter()`. */
 export type SemanticClassifierAdapter = {
-  classify: (canonicalInput: string) => Promise<Partial<ClassificationResult> | null>;
+  classify: (canonicalInput: string) => Promise<AdapterClassificationResult | null>;
 };
 
 /** Labels used when wrapping untrusted content with explicit trust-boundary markers. */
@@ -253,6 +286,8 @@ export type SanitizationOptions = {
   rules?: RuleDefinition[];
   redactRiskLevels?: RiskLevel[];
   maxInputLength?: number | false;
+  /** Canonicalization options. Default: { normalization: "NFC" } */
+  canonicalize?: import("./canonicalize.ts").CanonicalizeOptions;
   /** Observability hooks. All callbacks are best-effort — errors inside hooks are swallowed. */
   hooks?: SanitizationHooks;
 };
@@ -263,6 +298,8 @@ export type SanitizationResult = {
   redacted: boolean;
   matchedRuleIds: string[];
   reason: string;
+  /** Original raw input for forensic analysis. */
+  rawInput: string;
 };
 
 /**
