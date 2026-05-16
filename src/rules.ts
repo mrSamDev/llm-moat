@@ -133,41 +133,60 @@ function bufferToBase64(buffer: ArrayBuffer): string {
  */
 export async function loadRuleSetFromUrl(
   url: string,
-  opts: { integrity: string; signal?: AbortSignal },
+  opts: { integrity: string; signal?: AbortSignal; retries?: number; retryDelayMs?: number },
 ): Promise<RuleDefinition[]> {
   if (!opts.integrity) throw new Error("loadRuleSetFromUrl: integrity is required");
   const { algorithm, expected } = parseSriHash(opts.integrity);
 
-  let res: Response;
-  try {
-    res = await fetch(url, { signal: opts.signal });
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`loadRuleSetFromUrl: network error: ${msg}`);
+  const retries = opts.retries ?? 2;
+  const retryDelayMs = opts.retryDelayMs ?? 100;
+
+  let lastError: Error | null = null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const res = await fetch(url, { signal: opts.signal });
+
+      if (!res.ok) throw new Error(`loadRuleSetFromUrl: HTTP ${res.status} from ${url}`);
+
+      const buffer = await res.arrayBuffer();
+      const hashBuffer = await globalThis.crypto.subtle.digest(algorithm, buffer);
+      const actual = bufferToBase64(hashBuffer);
+      if (actual !== expected) throw new Error("loadRuleSetFromUrl: integrity mismatch");
+
+      let text: string;
+      try {
+        text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
+      } catch {
+        throw new Error("loadRuleSetFromUrl: response is not valid UTF-8");
+      }
+
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(text);
+      } catch {
+        throw new Error("loadRuleSetFromUrl: response is not valid JSON");
+      }
+
+      return loadRuleSetFromJson(parsed as Parameters<typeof loadRuleSetFromJson>[0]);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      
+      // Don't retry on integrity mismatch or validation errors (will fail again)
+      if (lastError.message.includes("integrity mismatch") ||
+          lastError.message.includes("UTF-8") ||
+          lastError.message.includes("JSON")) {
+        throw lastError;
+      }
+      
+      // Don't retry on network errors if no retries left
+      if (attempt >= retries) break;
+      
+      // Exponential backoff: 100ms, 200ms, 400ms...
+      await new Promise((resolve) => setTimeout(resolve, retryDelayMs * Math.pow(2, attempt)));
+    }
   }
 
-  if (!res.ok) throw new Error(`loadRuleSetFromUrl: HTTP ${res.status} from ${url}`);
-
-  const buffer = await res.arrayBuffer();
-  const hashBuffer = await globalThis.crypto.subtle.digest(algorithm, buffer);
-  const actual = bufferToBase64(hashBuffer);
-  if (actual !== expected) throw new Error("loadRuleSetFromUrl: integrity mismatch");
-
-  let text: string;
-  try {
-    text = new TextDecoder("utf-8", { fatal: true }).decode(buffer);
-  } catch {
-    throw new Error("loadRuleSetFromUrl: response is not valid UTF-8");
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    throw new Error("loadRuleSetFromUrl: response is not valid JSON");
-  }
-
-  return loadRuleSetFromJson(parsed as Parameters<typeof loadRuleSetFromJson>[0]);
+  throw lastError || new Error(`loadRuleSetFromUrl: failed after ${retries + 1} attempts`);
 }
 
 /**

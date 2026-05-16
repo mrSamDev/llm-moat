@@ -76,6 +76,10 @@ export type ClassificationResult = {
   canonicalInput: string;
   /** Original raw input for forensic analysis. */
   rawInput: string;
+  /** True when multiple distinct threat categories detected (multi-vector attack). */
+  isCompoundAttack: boolean;
+  /** All unique threat categories detected. Single category for most results. */
+  allCategories: ThreatCategory[];
   errors?: string[];
 };
 
@@ -248,6 +252,8 @@ export type StreamClassifierOptions = ClassifierOptions & {
 export type StreamClassifier = {
   /** Feed a chunk of text. Returns a ClassificationResult immediately if a threat at or above earlyExitRisk is found, otherwise null. */
   feed(chunk: string): ClassificationResult | null;
+  /** Feed multiple chunks at once. More efficient than individual feed() calls for batch processing. */
+  feedBatch(chunks: string[]): ClassificationResult | null;
   /** Flush accumulated input and return the final classification result. */
   flush(): ClassificationResult;
   /** Reset the classifier to its initial state for reuse. */

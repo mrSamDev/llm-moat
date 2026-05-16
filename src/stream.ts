@@ -32,7 +32,7 @@ function safeHook(fn: () => void): void {
  * early exit, prefer:
  *   - Using classify() directly on the complete text
  *   - Feeding larger chunks to reduce the number of passes
- *   - Using feedBatch() for bulk processing
+ *   - Using feedBatch() for bulk processing (single classify call)
  *
  * Example:
  *   const scanner = createStreamClassifier();
@@ -61,6 +61,15 @@ export function createStreamClassifier(options?: StreamClassifierOptions): Strea
   let isCommittedResult: ClassificationResult | null = null;
   let chunkIndex = 0;
   let startTime = Date.now();
+
+  function checkAndCommit(result: ClassificationResult): ClassificationResult | null {
+    if (RISK_ORDER[result.risk] <= RISK_ORDER[earlyExitRisk]) {
+      isCommitted = true;
+      isCommittedResult = result;
+      return result;
+    }
+    return null;
+  }
 
   return {
     feed(chunk: string): ClassificationResult | null {
@@ -92,23 +101,46 @@ export function createStreamClassifier(options?: StreamClassifierOptions): Strea
       }
 
       const result = classify(accumulated, classifyOptions);
-      if (RISK_ORDER[result.risk] <= RISK_ORDER[earlyExitRisk]) {
-        isCommitted = true;
-        isCommittedResult = result;
-        safeHook(() =>
-          options?.hooks?.onChunk?.({
-            chunkIndex: chunkIndex++,
-            accumulatedLength: accumulated.length,
-            earlyResult: result,
-          }),
-        );
-        return result;
+      const earlyExit = checkAndCommit(result);
+      
+      safeHook(() =>
+        options?.hooks?.onChunk?.({
+          chunkIndex: chunkIndex++,
+          accumulatedLength: accumulated.length,
+          earlyResult: earlyExit,
+        }),
+      );
+      
+      return earlyExit;
+    },
+
+    feedBatch(chunks: string[]): ClassificationResult | null {
+      if (isCommitted) {
+        return isCommittedResult;
       }
 
+      // Accumulate all chunks first, then classify once (O(n) instead of O(n²))
+      for (const chunk of chunks) {
+        accumulated += chunk;
+        if (accumulated.length > maxInputLength) {
+          accumulated = accumulated.slice(0, maxInputLength);
+          break;
+        }
+      }
+
+      const result = classify(accumulated, classifyOptions);
+      const earlyExit = checkAndCommit(result);
+
+      // Fire onChunk for the batch (use last chunk index)
       safeHook(() =>
-        options?.hooks?.onChunk?.({ chunkIndex: chunkIndex++, accumulatedLength: accumulated.length, earlyResult: null }),
+        options?.hooks?.onChunk?.({
+          chunkIndex: chunkIndex++,
+          accumulatedLength: accumulated.length,
+          earlyResult: earlyExit,
+        }),
       );
-      return null;
+
+      return earlyExit;
     },
 
     flush(): ClassificationResult {

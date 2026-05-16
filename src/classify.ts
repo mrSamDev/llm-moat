@@ -64,6 +64,9 @@ function classifyFromRules(canonicalInput: string, rawInput: string, rules: Rule
   const top = matches[0];
 
   if (top && (top.risk === "high" || top.risk === "medium")) {
+    // Extract unique categories from all matches
+    const allCategories = Array.from(new Set(matches.map((m) => m.category)));
+    
     return {
       risk: top.risk,
       category: top.category,
@@ -74,6 +77,8 @@ function classifyFromRules(canonicalInput: string, rawInput: string, rules: Rule
       confidence: computeConfidence(matches),
       canonicalInput,
       rawInput,
+      isCompoundAttack: allCategories.length > 1,
+      allCategories,
     };
   }
 
@@ -87,6 +92,8 @@ function classifyFromRules(canonicalInput: string, rawInput: string, rules: Rule
     confidence: 0.0,
     canonicalInput,
     rawInput,
+    isCompoundAttack: false,
+    allCategories: [],
   };
 }
 
@@ -107,6 +114,7 @@ function checkContextExhaustion(
   const highMatch = tailMatches.find((m) => m.risk === "high");
   if (!highMatch) return null;
 
+  const allCategories = Array.from(new Set(tailMatches.map((m) => m.category)));
   return {
     risk: "high",
     category: "context-exhaustion",
@@ -117,6 +125,8 @@ function checkContextExhaustion(
     confidence: CONFIDENCE_CONTEXT_EXHAUSTION,
     canonicalInput,
     rawInput: input,
+    isCompoundAttack: allCategories.length > 1,
+    allCategories,
   };
 }
 
@@ -130,16 +140,24 @@ function normalizeAdapterResult(
   const risk = adapterResult.risk as RiskLevel;
   const confidenceByRisk: Record<RiskLevel, number> = { high: CONFIDENCE_SINGLE_HIGH, medium: CONFIDENCE_SINGLE_MEDIUM, low: 0.0 };
 
+  // Extract unique categories from adapter matches if provided
+  const matches = adapterResult.matches ?? [];
+  const allCategories = matches.length > 0 
+    ? Array.from(new Set(matches.map((m) => m.category)))
+    : [adapterResult.category];
+
   return {
     risk,
     category: adapterResult.category,
     reason: adapterResult.reason ?? `Semantic adapter classified as ${risk}`,
     source: "semantic-adapter",
-    matches: adapterResult.matches ?? [],
+    matches,
     matchedRuleIds: adapterResult.matchedRuleIds ?? [],
     confidence: adapterResult.confidence ?? confidenceByRisk[risk],
     canonicalInput,
     rawInput,
+    isCompoundAttack: allCategories.length > 1,
+    allCategories,
     errors: adapterResult.errors,
   };
 }
