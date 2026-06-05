@@ -54,11 +54,6 @@
   "files": [
     "dist"
   ],
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
-  },
   "scripts": {
     "build": "tsup",
     "check": "tsc --noEmit",
