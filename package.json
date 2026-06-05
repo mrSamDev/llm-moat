@@ -17,6 +17,11 @@
     "typescript"
   ],
   "license": "MIT",
+  "pnpm": {
+    "overrides": {
+      "semver": "7.8.1"
+    }
+  },
   "engines": {
     "node": ">=18"
   },
