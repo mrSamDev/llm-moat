@@ -3,49 +3,22 @@
  * documents for prompt-injection patterns.
  */
 import { classify } from "./classify.ts";
+import { safeHook } from "./errors.ts";
 import { DEFAULT_MAX_INPUT_LENGTH, RISK_ORDER } from "./rules.ts";
 import type { ClassificationResult, RiskLevel, StreamClassifier, StreamClassifierOptions, StreamTelemetryEvent } from "./types.ts";
 
-function safeHook(fn: () => void): void {
-  try {
-    fn();
-  } catch {
-    // hooks are best-effort, never let them break streaming
-  }
-}
-
 /**
- * Creates a streaming classifier that processes text in chunks.
+ * Streaming classifier for chunked documents.
  *
- * Feed chunks one at a time. The classifier:
- *   - Accumulates chunks up to maxInputLength (default 16KB)
- *   - Returns a ClassificationResult immediately when a threat at or above
- *     earlyExitRisk is detected (default "high"), so you can short-circuit
- *     large document processing early
- *   - Returns the full accumulated result on flush()
- *
- * Handles cross-chunk patterns by accumulating the full text rather than
- * processing chunks independently.
- *
- * Performance note: each feed() re-classifies the full accumulated buffer from
- * the start (O(n²) total work for a clean document). For large documents without
- * early exit, prefer using classify() directly on the complete text, or feed
- * larger chunks to reduce the number of passes.
- *
- * Example:
- *   const scanner = createStreamClassifier();
- *   for await (const chunk of documentStream) {
- *     const earlyResult = scanner.feed(chunk);
- *     if (earlyResult) { // high-risk found, stop processing
- *       return earlyResult;
- *     }
- *   }
- *   const finalResult = scanner.flush();
+ * Scans a trailing window on each feed() so cross-chunk patterns are still
+ * caught, but total work stays O(total_input) for clean documents instead of
+ * O(n²).
  */
 export function createStreamClassifier(options?: StreamClassifierOptions): StreamClassifier {
   const maxInputLength =
     options?.maxInputLength === false ? Infinity : (options?.maxInputLength ?? DEFAULT_MAX_INPUT_LENGTH);
   const earlyExitRisk: RiskLevel = options?.earlyExitRisk ?? "high";
+  const scanWindowSize = options?.scanWindowSize ?? 1024;
 
   // Pass maxInputLength: false to classify() — the stream classifier enforces
   // its own length limit by truncating accumulated input before calling classify.
@@ -53,12 +26,37 @@ export function createStreamClassifier(options?: StreamClassifierOptions): Strea
   // the stream fires its own onTelemetry once from flush().
   const { onTelemetry: _streamTelemetry, ...classifyHooks } = options?.hooks ?? {};
   const classifyOptions = { ...options, maxInputLength: false as const, hooks: classifyHooks };
+  // Window scans operate on partial text; context-exhaustion only makes sense for the full document.
+  const windowClassifyOptions = { ...classifyOptions, contextExhaustion: false as const };
 
   let accumulated = "";
   let isCommitted = false;
   let isCommittedResult: ClassificationResult | null = null;
   let chunkIndex = 0;
   let startTime = Date.now();
+
+  function checkAndCommit(result: ClassificationResult): ClassificationResult | null {
+    if (RISK_ORDER[result.risk] <= RISK_ORDER[earlyExitRisk]) {
+      isCommitted = true;
+      isCommittedResult = result;
+      return result;
+    }
+    return null;
+  }
+
+  // Scan only the trailing window for early-exit threats. If a threat is found,
+  // re-run on the full accumulated text so canonicalInput, rawInput, and
+  // context-exhaustion results are correct for the final verdict.
+  function scanWindow(): ClassificationResult {
+    const scanTarget = accumulated.length > scanWindowSize
+      ? accumulated.slice(-scanWindowSize)
+      : accumulated;
+    const result = classify(scanTarget, windowClassifyOptions);
+    if (RISK_ORDER[result.risk] <= RISK_ORDER[earlyExitRisk]) {
+      return classify(accumulated, classifyOptions);
+    }
+    return result;
+  }
 
   return {
     feed(chunk: string): ClassificationResult | null {
@@ -89,24 +87,47 @@ export function createStreamClassifier(options?: StreamClassifierOptions): Strea
         return isCommittedResult;
       }
 
-      const result = classify(accumulated, classifyOptions);
-      if (RISK_ORDER[result.risk] <= RISK_ORDER[earlyExitRisk]) {
-        isCommitted = true;
-        isCommittedResult = result;
-        safeHook(() =>
-          options?.hooks?.onChunk?.({
-            chunkIndex: chunkIndex++,
-            accumulatedLength: accumulated.length,
-            earlyResult: result,
-          }),
-        );
-        return result;
+      const result = scanWindow();
+      const earlyExit = checkAndCommit(result);
+      
+      safeHook(() =>
+        options?.hooks?.onChunk?.({
+          chunkIndex: chunkIndex++,
+          accumulatedLength: accumulated.length,
+          earlyResult: earlyExit,
+        }),
+      );
+      
+      return earlyExit;
+    },
+
+    feedBatch(chunks: string[]): ClassificationResult | null {
+      if (isCommitted) {
+        return isCommittedResult;
       }
 
+      // Accumulate all chunks first, then classify once (O(n) instead of O(n²))
+      for (const chunk of chunks) {
+        accumulated += chunk;
+        if (accumulated.length > maxInputLength) {
+          accumulated = accumulated.slice(0, maxInputLength);
+          break;
+        }
+      }
+
+      const result = scanWindow();
+      const earlyExit = checkAndCommit(result);
+
+      // Fire onChunk for the batch (use last chunk index)
       safeHook(() =>
-        options?.hooks?.onChunk?.({ chunkIndex: chunkIndex++, accumulatedLength: accumulated.length, earlyResult: null }),
+        options?.hooks?.onChunk?.({
+          chunkIndex: chunkIndex++,
+          accumulatedLength: accumulated.length,
+          earlyResult: earlyExit,
+        }),
       );
-      return null;
+
+      return earlyExit;
     },
 
     flush(): ClassificationResult {

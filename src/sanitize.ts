@@ -2,18 +2,10 @@
  * Sanitization helpers for wrapping untrusted text and redacting content that
  * matches prompt-injection rules.
  */
-import { canonicalize } from "./canonicalize.ts";
-import { guardInputLength } from "./errors.ts";
+import { canonicalize, type CanonicalizeOptions } from "./canonicalize.ts";
+import { guardInputLength, safeHook } from "./errors.ts";
 import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules.ts";
 import type { SanitizationOptions, SanitizationResult, SanitizeTelemetryEvent, TrustBoundaryOptions } from "./types.ts";
-
-function safeHook(fn: () => void): void {
-  try {
-    fn();
-  } catch {
-    // hooks are best-effort — never let them break sanitization
-  }
-}
 
 /** Wraps untrusted content in explicit boundary markers for downstream prompts. */
 export function labelUntrustedText(text: string, options?: TrustBoundaryOptions): string {
@@ -34,7 +26,8 @@ export function sanitizeUntrustedText(text: string, options?: SanitizationOption
   const start = Date.now();
   guardInputLength(text, options?.maxInputLength, DEFAULT_MAX_INPUT_LENGTH);
 
-  const canonicalInput = canonicalize(text);
+  const canonicalOptions: CanonicalizeOptions = options?.canonicalize ?? { normalization: "NFC" };
+  const canonicalInput = canonicalize(text, canonicalOptions);
   const rules = options?.rules ?? defaultRuleSet;
   const redactRiskLevels = options?.redactRiskLevels ?? ["high", "medium"];
   const redactionText = options?.redactionText ?? "[content redacted by input filter]";
@@ -49,12 +42,14 @@ export function sanitizeUntrustedText(text: string, options?: SanitizationOption
           redacted: true,
           matchedRuleIds: triggeredMatches.map((m) => m.id),
           reason: triggeredMatches[0].reason,
+          rawInput: text,
         }
       : {
           text,
           redacted: false,
           matchedRuleIds: [],
           reason: "No sanitization rules matched",
+          rawInput: text,
         };
 
   const durationMs = Date.now() - start;

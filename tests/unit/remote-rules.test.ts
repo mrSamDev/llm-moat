@@ -1,5 +1,6 @@
+// fallow-ignore-file unused-file
 import { afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { loadRuleSetFromUrl } from "../../src/rules";
+import { loadRuleSetFromUrl } from "../../src/rules-remote";
 
 const SAMPLE_JSON = JSON.stringify({
   rules: [{ id: "remote-test", patterns: ["inject"], risk: "high", category: "custom", reason: "remote test rule" }],
@@ -87,9 +88,10 @@ describe("loadRuleSetFromUrl", () => {
     globalThis.fetch = async () => {
       throw new Error("ECONNREFUSED");
     };
+    // With retries (default 2), should fail after ~3 attempts with the original error
     await expect(
-      loadRuleSetFromUrl("https://example.com/rules.json", { integrity: sha256Integrity }),
-    ).rejects.toThrow("network error");
+      loadRuleSetFromUrl("https://example.com/rules.json", { integrity: sha256Integrity, retries: 0 }),
+    ).rejects.toThrow("ECONNREFUSED");
   });
 
   test("throws on non-2xx HTTP status", async () => {

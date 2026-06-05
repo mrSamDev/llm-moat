@@ -1,15 +1,14 @@
 /**
- * Classification APIs for rule-based prompt-injection detection with optional
- * semantic model fallback.
+ * Synchronous rule-based classification with optional context-exhaustion checks
+ * and compound-attack detection.
  */
-import { canonicalize } from "./canonicalize.ts";
-import { guardInputLength } from "./errors.ts";
+import { canonicalize, type CanonicalizeOptions } from "./canonicalize.ts";
+import { guardInputLength, safeHook } from "./errors.ts";
 import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules.ts";
 import type {
-  AsyncClassifierOptions,
   ClassificationResult,
-  ClassifierOptions,
   ClassifyTelemetryEvent,
+  ClassifierOptions,
   RiskLevel,
   RuleDefinition,
   RuleMatch,
@@ -17,14 +16,6 @@ import type {
 
 function getRules(options?: ClassifierOptions): RuleDefinition[] {
   return options?.ruleSet ?? defaultRuleSet;
-}
-
-function safeHook(fn: () => void): void {
-  try {
-    fn();
-  } catch {
-    // hooks are best-effort, never let them break classification
-  }
 }
 
 const CONFIDENCE_SINGLE_MEDIUM = 0.6;
@@ -57,11 +48,13 @@ function computeConfidence(matches: RuleMatch[]): number {
   return CONFIDENCE_SINGLE_MEDIUM;
 }
 
-function classifyFromRules(canonicalInput: string, rules: RuleDefinition[]): ClassificationResult {
+function classifyFromRules(canonicalInput: string, rawInput: string, rules: RuleDefinition[]): ClassificationResult {
   const matches = findAllRuleMatches(canonicalInput, rules);
   const top = matches[0];
 
   if (top && (top.risk === "high" || top.risk === "medium")) {
+    const allCategories = Array.from(new Set(matches.map((m) => m.category)));
+
     return {
       risk: top.risk,
       category: top.category,
@@ -71,6 +64,9 @@ function classifyFromRules(canonicalInput: string, rules: RuleDefinition[]): Cla
       matchedRuleIds: matches.map((m) => m.id),
       confidence: computeConfidence(matches),
       canonicalInput,
+      rawInput,
+      isCompoundAttack: allCategories.length > 1,
+      allCategories,
     };
   }
 
@@ -83,6 +79,9 @@ function classifyFromRules(canonicalInput: string, rules: RuleDefinition[]): Cla
     matchedRuleIds: [],
     confidence: 0.0,
     canonicalInput,
+    rawInput,
+    isCompoundAttack: false,
+    allCategories: [],
   };
 }
 
@@ -103,6 +102,7 @@ function checkContextExhaustion(
   const highMatch = tailMatches.find((m) => m.risk === "high");
   if (!highMatch) return null;
 
+  const allCategories = Array.from(new Set(tailMatches.map((m) => m.category)));
   return {
     risk: "high",
     category: "context-exhaustion",
@@ -112,39 +112,22 @@ function checkContextExhaustion(
     matchedRuleIds: tailMatches.map((m) => m.id),
     confidence: CONFIDENCE_CONTEXT_EXHAUSTION,
     canonicalInput,
-  };
-}
-
-function normalizeAdapterResult(
-  canonicalInput: string,
-  adapterResult: Partial<ClassificationResult> | null,
-): ClassificationResult | null {
-  if (!adapterResult?.risk || !adapterResult.category) return null;
-
-  const risk = adapterResult.risk as RiskLevel;
-  const confidenceByRisk: Record<RiskLevel, number> = { high: CONFIDENCE_SINGLE_HIGH, medium: CONFIDENCE_SINGLE_MEDIUM, low: 0.0 };
-
-  return {
-    risk,
-    category: adapterResult.category,
-    reason: adapterResult.reason ?? `Semantic adapter classified as ${risk}`,
-    source: "semantic-adapter",
-    matches: adapterResult.matches ?? [],
-    matchedRuleIds: adapterResult.matchedRuleIds ?? [],
-    confidence: adapterResult.confidence ?? confidenceByRisk[risk],
-    canonicalInput,
-    errors: adapterResult.errors,
+    rawInput: input,
+    isCompoundAttack: allCategories.length > 1,
+    allCategories,
   };
 }
 
 /** Classifies input with the built-in or provided rule set. */
+// fallow-ignore-next-line complexity
 export function classify(input: string, options?: ClassifierOptions): ClassificationResult {
   if (typeof input !== "string") throw new TypeError("classify: input must be a string");
   const start = Date.now();
   guardInputLength(input, options?.maxInputLength, DEFAULT_MAX_INPUT_LENGTH);
-  const canonicalInput = canonicalize(input);
+  const canonicalOptions: CanonicalizeOptions = options?.canonicalize ?? { normalization: "NFC" };
+  const canonicalInput = canonicalize(input, canonicalOptions);
   const exhaustion = checkContextExhaustion(input, canonicalInput, options);
-  const result = exhaustion ?? classifyFromRules(canonicalInput, getRules(options));
+  const result = exhaustion ?? classifyFromRules(canonicalInput, input, getRules(options));
   const durationMs = Date.now() - start;
   safeHook(() => options?.hooks?.onClassify?.(result, { durationMs, inputLength: input.length }));
   safeHook(() => {
@@ -162,52 +145,4 @@ export function classify(input: string, options?: ClassifierOptions): Classifica
     options?.hooks?.onTelemetry?.(event);
   });
   return result;
-}
-
-/** Classifies input with rules first, then optionally consults a semantic adapter for low-risk results. */
-export async function classifyWithAdapter(
-  input: string,
-  options: AsyncClassifierOptions,
-): Promise<ClassificationResult> {
-  if (typeof input !== "string") throw new TypeError("classify: input must be a string");
-  const { adapter, ...classifierOptions } = options;
-  const syncResult = classify(input, classifierOptions);
-
-  if (syncResult.risk !== "low") {
-    safeHook(() => options.hooks?.onAdapterCall?.(syncResult, { durationMs: 0, skipped: true }));
-    return syncResult;
-  }
-
-  const adapterStart = Date.now();
-  try {
-    const adapterResult = normalizeAdapterResult(
-      syncResult.canonicalInput,
-      await adapter.classify(syncResult.canonicalInput),
-    );
-    if (adapterResult) {
-      safeHook(() =>
-        options.hooks?.onAdapterCall?.(adapterResult, { durationMs: Date.now() - adapterStart, skipped: false }),
-      );
-      return adapterResult;
-    }
-    const fallback = { ...syncResult, errors: ["Semantic classifier returned no usable result"] };
-    safeHook(() =>
-      options.hooks?.onAdapterCall?.(fallback, { durationMs: Date.now() - adapterStart, skipped: false }),
-    );
-    return fallback;
-  } catch (error) {
-    if (options.fallbackToRulesOnError === false) {
-      throw error;
-    }
-    const errMsg = error instanceof Error ? error.message : "Semantic classifier error";
-    const fallback = { ...syncResult, errors: [errMsg] };
-    safeHook(() =>
-      options.hooks?.onAdapterCall?.(fallback, {
-        durationMs: Date.now() - adapterStart,
-        skipped: false,
-        error: errMsg,
-      }),
-    );
-    return fallback;
-  }
 }

@@ -10,6 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
       - uses: pnpm/action-setup@v2
         with:
           version: latest
@@ -17,5 +22,22 @@ jobs:
         with:
           bun-version: latest
       - run: pnpm install --frozen-lockfile
+
+      # PRs: require changeset
+      - name: Check changeset
+        if: github.event_name == 'pull_request'
+        run: pnpm changeset status --since=origin/main
+
+      # PRs: block merge if codebase score < 85
+      - name: Complexity score gate
+        if: github.event_name == 'pull_request'
+        run: npx fallow score --gate 85
+
+      # Main branch: full audit non-blocking for tracking
+      - name: Complexity audit (full)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: npx fallow audit --format json
+
       - run: pnpm test
       - run: pnpm typecheck

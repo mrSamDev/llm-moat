@@ -26,3 +26,12 @@ export function guardInputLength(text: string, maxLength: number | false | undef
     throw new InputTooLongError(text.length, max);
   }
 }
+
+/** Execute a hook callback, swallowing any errors. Hooks must never break the calling function. */
+export function safeHook(fn: () => void): void {
+  try {
+    fn();
+  } catch {
+    // hooks are best-effort
+  }
+}

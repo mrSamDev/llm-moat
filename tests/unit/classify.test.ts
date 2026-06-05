@@ -1,5 +1,7 @@
+// fallow-ignore-file unused-file
 import { describe, expect, test } from "bun:test";
-import { classify, classifyWithAdapter } from "../../src/classify";
+import { classify } from "../../src/classify";
+import { classifyWithAdapter } from "../../src/classify-adapter";
 import { sanitizeUntrustedText } from "../../src/sanitize";
 import { InputTooLongError } from "../../src/errors";
 import type { ClassifyTelemetryEvent, RuleDefinition } from "../../src/types";

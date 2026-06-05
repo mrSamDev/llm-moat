@@ -2,8 +2,8 @@
  * OpenAI-compatible semantic classifier adapter primitives for providers that
  * expose a `/chat/completions` style API.
  */
-import type { ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
-import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared.ts";
+import type { AdapterClassificationResult, ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
+import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson, withTimeout } from "./shared.ts";
 
 /** Configuration for any OpenAI-compatible semantic classifier provider. */
 type OpenAICompatibleAdapterOptions = {
@@ -12,6 +12,8 @@ type OpenAICompatibleAdapterOptions = {
   baseURL?: string;
   systemPrompt?: string;
   headers?: Record<string, string>;
+  /** Abort the request after this many milliseconds. Default: 30000. */
+  timeoutMs?: number;
 };
 
 /** Minimal shape of a chat completion response used by this adapter. */
@@ -37,23 +39,28 @@ export function createOpenAICompatibleAdapter(
   const systemPrompt = options.systemPrompt ?? DEFAULT_CLASSIFICATION_PROMPT;
 
   return {
-    async classify(canonicalInput: string): Promise<Partial<ClassificationResult> | null> {
-      const response = await fetch(`${options.baseURL ?? "https://api.openai.com/v1"}/chat/completions`, {
-        method: "POST",
-        headers: {
-          "content-type": "application/json",
-          authorization: `Bearer ${options.apiKey}`,
-          ...options.headers,
-        },
-        body: JSON.stringify({
-          model: options.model,
-          temperature: 0,
-          messages: [
-            { role: "system", content: systemPrompt },
-            { role: "user", content: canonicalInput },
-          ],
+    async classify(canonicalInput: string): Promise<AdapterClassificationResult | null> {
+      const timeoutMs = options.timeoutMs ?? 30_000;
+
+      const response = await withTimeout(timeoutMs, async (signal) =>
+        fetch(`${options.baseURL ?? "https://api.openai.com/v1"}/chat/completions`, {
+          method: "POST",
+          headers: {
+            "content-type": "application/json",
+            authorization: `Bearer ${options.apiKey}`,
+            ...options.headers,
+          },
+          body: JSON.stringify({
+            model: options.model,
+            temperature: 0,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: canonicalInput },
+            ],
+          }),
+          signal,
         }),
-      });
+      );
 
       if (!response.ok) {
         throw new Error(`Semantic classifier request failed with ${response.status}`);

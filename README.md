@@ -2,7 +2,7 @@
 
 Zero-dependency TypeScript toolkit for detecting and sanitizing prompt injection in LLM applications.
 
-**v0.2.2** — multi-match classification · confidence scores · streaming classifier · portable JSON rule format · ReDoS-safe patterns · input length guard · telemetry hooks · remote rule sets
+**v0.3.0** — streaming performance fix · adapter timeouts · named state sharing · ReDoS-safe patterns · input length guard · telemetry hooks · remote rule sets
 
 ---
 
