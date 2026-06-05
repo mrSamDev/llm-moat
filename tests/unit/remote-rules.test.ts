@@ -1,5 +1,6 @@
+// fallow-ignore-file unused-file
 import { afterEach, beforeAll, describe, expect, test } from "bun:test";
-import { loadRuleSetFromUrl } from "../../src/rules";
+import { loadRuleSetFromUrl } from "../../src/rules-remote";
 
 const SAMPLE_JSON = JSON.stringify({
   rules: [{ id: "remote-test", patterns: ["inject"], risk: "high", category: "custom", reason: "remote test rule" }],

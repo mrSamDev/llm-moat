@@ -17,5 +17,17 @@ jobs:
         with:
           bun-version: latest
       - run: pnpm install --frozen-lockfile
+
+      # PRs: block merge if new complexity introduced
+      - name: Complexity audit (new issues only)
+        if: github.event_name == 'pull_request'
+        run: npx fallow audit --gate new-only
+
+      # Main branch: full audit non-blocking for tracking
+      - name: Complexity audit (full)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: npx fallow audit --format json
+
       - run: pnpm test
       - run: pnpm typecheck

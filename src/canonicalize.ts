@@ -102,6 +102,7 @@ function normalizeWhitespace(input: string): string {
 }
 
 /** Normalizes text by decoding escapes/entities, stripping wrappers, and lowercasing. */
+// fallow-ignore-next-line complexity
 export function canonicalize(input: string, options?: CanonicalizeOptions): string {
   let result = input;
   

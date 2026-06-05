@@ -1,10 +1,12 @@
+// fallow-ignore-file unused-file
 /**
  * Integration tests: classifyWithAdapter pipeline.
  * Tests rule-first fallback to semantic adapter, adapter error handling,
  * JSON rule format composition, and the full detection pipeline.
  */
 import { describe, expect, test } from "bun:test";
-import { classify, classifyWithAdapter } from "../../src/classify";
+import { classify } from "../../src/classify";
+import { classifyWithAdapter } from "../../src/classify-adapter";
 import { loadRuleSetFromJson, exportRuleSetToJson, createRuleSet } from "../../src/rules";
 import {
   staticAdapter,

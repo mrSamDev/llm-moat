@@ -3,17 +3,9 @@
  * matches prompt-injection rules.
  */
 import { canonicalize, type CanonicalizeOptions } from "./canonicalize.ts";
-import { guardInputLength } from "./errors.ts";
+import { guardInputLength, safeHook } from "./errors.ts";
 import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules.ts";
 import type { SanitizationOptions, SanitizationResult, SanitizeTelemetryEvent, TrustBoundaryOptions } from "./types.ts";
-
-function safeHook(fn: () => void): void {
-  try {
-    fn();
-  } catch {
-    // hooks are best-effort — never let them break sanitization
-  }
-}
 
 /** Wraps untrusted content in explicit boundary markers for downstream prompts. */
 export function labelUntrustedText(text: string, options?: TrustBoundaryOptions): string {

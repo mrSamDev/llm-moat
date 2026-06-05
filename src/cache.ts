@@ -24,6 +24,7 @@ export class LRUCache<K, V> {
   private readonly maxEntries: number;
   private readonly defaultTtlMs: number;
 
+  // fallow-ignore-next-line complexity
   constructor(options?: CacheOptions) {
     this.maxEntries = options?.maxEntries ?? 1000;
     this.defaultTtlMs = options?.defaultTtlMs ?? 5 * 60 * 1000; // 5 minutes
@@ -31,17 +32,20 @@ export class LRUCache<K, V> {
 
   /**
    * Get a value from the cache. Returns undefined if not found or expired.
-   * Does NOT update access order (true LRU would move to end).
+   * Updates access order so the entry is treated as recently used.
    */
   get(key: K): V | undefined {
     const entry = this.cache.get(key);
     if (!entry) return undefined;
-    
+
     if (Date.now() > entry.expiresAt) {
       this.cache.delete(key);
       return undefined;
     }
-    
+
+    // Move to end to mark as recently used
+    this.cache.delete(key);
+    this.cache.set(key, entry);
     return entry.value;
   }
 

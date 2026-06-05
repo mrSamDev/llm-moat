@@ -16,6 +16,8 @@ type OllamaAdapterOptions = {
   baseURL?: string;
   /** Default: DEFAULT_CLASSIFICATION_PROMPT */
   systemPrompt?: string;
+  /** Abort the request after this many milliseconds. Default: 30000. */
+  timeoutMs?: number;
 };
 
 /**
@@ -48,5 +50,6 @@ export function createOllamaAdapter(options: OllamaAdapterOptions): SemanticClas
     model: options.model,
     baseURL: `${baseURL}/v1`,
     systemPrompt: options.systemPrompt ?? DEFAULT_CLASSIFICATION_PROMPT,
+    timeoutMs: options.timeoutMs,
   });
 }

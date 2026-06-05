@@ -1,3 +1,4 @@
+// fallow-ignore-file unused-file
 import { describe, test, expect } from "bun:test";
 import { canonicalize } from "../../src/canonicalize.ts";
 import { classify } from "../../src/classify.ts";

@@ -14,6 +14,8 @@ type OpenAIAdapterOptions = {
   systemPrompt?: string;
   /** Your OpenAI organization ID, if applicable. */
   organization?: string;
+  /** Abort the request after this many milliseconds. Default: 30000. */
+  timeoutMs?: number;
 };
 
 /**
@@ -34,5 +36,6 @@ export function createOpenAIAdapter(options: OpenAIAdapterOptions): SemanticClas
     baseURL: "https://api.openai.com/v1",
     systemPrompt: options.systemPrompt ?? DEFAULT_CLASSIFICATION_PROMPT,
     headers: options.organization ? { "openai-organization": options.organization } : undefined,
+    timeoutMs: options.timeoutMs,
   });
 }

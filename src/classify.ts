@@ -1,17 +1,14 @@
 /**
- * Classification APIs for rule-based prompt-injection detection with optional
- * semantic model fallback.
+ * Synchronous rule-based classification with optional context-exhaustion checks
+ * and compound-attack detection.
  */
 import { canonicalize, type CanonicalizeOptions } from "./canonicalize.ts";
-import { guardInputLength } from "./errors.ts";
+import { guardInputLength, safeHook } from "./errors.ts";
 import { DEFAULT_MAX_INPUT_LENGTH, defaultRuleSet, findAllRuleMatches } from "./rules.ts";
-import { LRUCache } from "./cache.ts";
 import type {
-  AdapterClassificationResult,
-  AsyncClassifierOptions,
   ClassificationResult,
-  ClassifierOptions,
   ClassifyTelemetryEvent,
+  ClassifierOptions,
   RiskLevel,
   RuleDefinition,
   RuleMatch,
@@ -19,14 +16,6 @@ import type {
 
 function getRules(options?: ClassifierOptions): RuleDefinition[] {
   return options?.ruleSet ?? defaultRuleSet;
-}
-
-function safeHook(fn: () => void): void {
-  try {
-    fn();
-  } catch {
-    // hooks are best-effort, never let them break classification
-  }
 }
 
 const CONFIDENCE_SINGLE_MEDIUM = 0.6;
@@ -64,9 +53,8 @@ function classifyFromRules(canonicalInput: string, rawInput: string, rules: Rule
   const top = matches[0];
 
   if (top && (top.risk === "high" || top.risk === "medium")) {
-    // Extract unique categories from all matches
     const allCategories = Array.from(new Set(matches.map((m) => m.category)));
-    
+
     return {
       risk: top.risk,
       category: top.category,
@@ -130,39 +118,8 @@ function checkContextExhaustion(
   };
 }
 
-function normalizeAdapterResult(
-  canonicalInput: string,
-  rawInput: string,
-  adapterResult: AdapterClassificationResult | null,
-): ClassificationResult | null {
-  if (!adapterResult?.risk || !adapterResult.category) return null;
-
-  const risk = adapterResult.risk as RiskLevel;
-  const confidenceByRisk: Record<RiskLevel, number> = { high: CONFIDENCE_SINGLE_HIGH, medium: CONFIDENCE_SINGLE_MEDIUM, low: 0.0 };
-
-  // Extract unique categories from adapter matches if provided
-  const matches = adapterResult.matches ?? [];
-  const allCategories = matches.length > 0 
-    ? Array.from(new Set(matches.map((m) => m.category)))
-    : [adapterResult.category];
-
-  return {
-    risk,
-    category: adapterResult.category,
-    reason: adapterResult.reason ?? `Semantic adapter classified as ${risk}`,
-    source: "semantic-adapter",
-    matches,
-    matchedRuleIds: adapterResult.matchedRuleIds ?? [],
-    confidence: adapterResult.confidence ?? confidenceByRisk[risk],
-    canonicalInput,
-    rawInput,
-    isCompoundAttack: allCategories.length > 1,
-    allCategories,
-    errors: adapterResult.errors,
-  };
-}
-
 /** Classifies input with the built-in or provided rule set. */
+// fallow-ignore-next-line complexity
 export function classify(input: string, options?: ClassifierOptions): ClassificationResult {
   if (typeof input !== "string") throw new TypeError("classify: input must be a string");
   const start = Date.now();
@@ -188,169 +145,4 @@ export function classify(input: string, options?: ClassifierOptions): Classifica
     options?.hooks?.onTelemetry?.(event);
   });
   return result;
-}
-
-/** Circuit breaker state for adapter calls. */
-type CircuitBreakerState = {
-  failures: number;
-  lastFailureTime: number | null;
-  isOpen: boolean;
-};
-
-/** Internal state for classifyWithAdapter. */
-type AdapterState = {
-  cache?: LRUCache<string, ClassificationResult>;
-  circuitBreaker?: CircuitBreakerState;
-};
-
-function createAdapterState(options: AsyncClassifierOptions): AdapterState {
-  const state: AdapterState = {};
-
-  if (options.cache) {
-    state.cache = new LRUCache({
-      maxEntries: options.cache.maxEntries,
-      defaultTtlMs: options.cache.ttlMs,
-    });
-  }
-
-  if (options.circuitBreaker) {
-    state.circuitBreaker = {
-      failures: 0,
-      lastFailureTime: null,
-      isOpen: false,
-    };
-  }
-
-  return state;
-}
-
-function shouldAllowCircuitBreakerCall(
-  state: CircuitBreakerState,
-  failureThreshold: number,
-  resetTimeoutMs: number,
-): boolean {
-  if (!state.isOpen) {
-    return true;
-  }
-
-  // Check if reset timeout has passed
-  if (state.lastFailureTime && Date.now() - state.lastFailureTime >= resetTimeoutMs) {
-    state.isOpen = false;
-    state.failures = 0;
-    return true;
-  }
-
-  return false;
-}
-
-function recordCircuitBreakerSuccess(state: CircuitBreakerState): void {
-  state.failures = 0;
-  state.isOpen = false;
-}
-
-function recordCircuitBreakerFailure(
-  state: CircuitBreakerState,
-  failureThreshold: number,
-): void {
-  state.failures++;
-  state.lastFailureTime = Date.now();
-  
-  if (state.failures >= failureThreshold) {
-    state.isOpen = true;
-  }
-}
-
-/** Classifies input with rules first, then optionally consults a semantic adapter for low-risk results. */
-export async function classifyWithAdapter(
-  input: string,
-  options: AsyncClassifierOptions,
-): Promise<ClassificationResult> {
-  if (typeof input !== "string") throw new TypeError("classify: input must be a string");
-  const { adapter, ...classifierOptions } = options;
-  const syncResult = classify(input, classifierOptions);
-
-  if (syncResult.risk !== "low") {
-    safeHook(() => options.hooks?.onAdapterCall?.(syncResult, { durationMs: 0, skipped: true }));
-    return syncResult;
-  }
-
-  const state = createAdapterState(options);
-  const cacheKey = syncResult.canonicalInput;
-
-  // Check cache first
-  if (state.cache) {
-    const cached = state.cache.get(cacheKey);
-    if (cached) {
-      safeHook(() => options.hooks?.onAdapterCall?.(cached, { durationMs: 0, skipped: false }));
-      return cached;
-    }
-  }
-
-  // Check circuit breaker
-  if (state.circuitBreaker) {
-    const { failureThreshold = 5, resetTimeoutMs = 30 * 1000 } = options.circuitBreaker!;
-    if (!shouldAllowCircuitBreakerCall(state.circuitBreaker, failureThreshold, resetTimeoutMs)) {
-      const fallback = { ...syncResult, errors: ["Circuit breaker open - adapter calls temporarily disabled"] };
-      safeHook(() =>
-        options.hooks?.onAdapterCall?.(fallback, {
-          durationMs: 0,
-          skipped: false,
-          error: "Circuit breaker open",
-        }),
-      );
-      return fallback;
-    }
-  }
-
-  const adapterStart = Date.now();
-  try {
-    const adapterResult = normalizeAdapterResult(
-      syncResult.canonicalInput,
-      syncResult.rawInput,
-      await adapter.classify(syncResult.canonicalInput),
-    );
-    
-    if (adapterResult) {
-      // Record success for circuit breaker
-      if (state.circuitBreaker) {
-        recordCircuitBreakerSuccess(state.circuitBreaker);
-      }
-      
-      // Cache the result
-      if (state.cache) {
-        state.cache.set(cacheKey, adapterResult, options.cache?.ttlMs);
-      }
-      
-      safeHook(() =>
-        options.hooks?.onAdapterCall?.(adapterResult, { durationMs: Date.now() - adapterStart, skipped: false }),
-      );
-      return adapterResult;
-    }
-    
-    const fallback = { ...syncResult, errors: ["Semantic classifier returned no usable result"] };
-    safeHook(() =>
-      options.hooks?.onAdapterCall?.(fallback, { durationMs: Date.now() - adapterStart, skipped: false }),
-    );
-    return fallback;
-  } catch (error) {
-    // Record failure for circuit breaker
-    if (state.circuitBreaker) {
-      const { failureThreshold = 5 } = options.circuitBreaker!;
-      recordCircuitBreakerFailure(state.circuitBreaker, failureThreshold);
-    }
-    
-    if (options.fallbackToRulesOnError === false) {
-      throw error;
-    }
-    const errMsg = error instanceof Error ? error.message : "Semantic classifier error";
-    const fallback = { ...syncResult, errors: [errMsg] };
-    safeHook(() =>
-      options.hooks?.onAdapterCall?.(fallback, {
-        durationMs: Date.now() - adapterStart,
-        skipped: false,
-        error: errMsg,
-      }),
-    );
-    return fallback;
-  }
 }

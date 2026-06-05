@@ -2,7 +2,7 @@
  * Anthropic adapter entrypoint for semantic prompt-injection classification.
  */
 import type { AdapterClassificationResult, ClassificationResult, SemanticClassifierAdapter } from "../types.ts";
-import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson } from "./shared.ts";
+import { DEFAULT_CLASSIFICATION_PROMPT, parseClassifierJson, withTimeout } from "./shared.ts";
 
 /** Minimal Anthropic client contract required by the adapter. */
 type AnthropicClient = {
@@ -12,6 +12,7 @@ type AnthropicClient = {
       max_tokens: number;
       system?: string;
       messages: Array<{ role: string; content: string }>;
+      signal?: AbortSignal;
     }): Promise<{
       content: Array<{ type: string; text?: string }>;
     }>;
@@ -25,6 +26,8 @@ type AnthropicAdapterOptions = {
   model?: string;
   /** Default: DEFAULT_CLASSIFICATION_PROMPT */
   systemPrompt?: string;
+  /** Abort the request after this many milliseconds. Default: 30000. */
+  timeoutMs?: number;
 };
 
 /** Creates a semantic classifier adapter backed by the Anthropic Messages API. */
@@ -34,12 +37,17 @@ export function createAnthropicAdapter(options: AnthropicAdapterOptions): Semant
 
   return {
     async classify(canonicalInput: string): Promise<AdapterClassificationResult | null> {
-      const response = await options.client.messages.create({
-        model,
-        max_tokens: 256,
-        system: systemPrompt,
-        messages: [{ role: "user", content: canonicalInput }],
-      });
+      const timeoutMs = options.timeoutMs ?? 30_000;
+
+      const response = await withTimeout(timeoutMs, async (signal) =>
+        options.client.messages.create({
+          model,
+          max_tokens: 256,
+          system: systemPrompt,
+          messages: [{ role: "user", content: canonicalInput }],
+          signal,
+        }),
+      );
 
       const text = response.content
         .filter((block) => block.type === "text")

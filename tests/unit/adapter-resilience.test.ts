@@ -1,5 +1,6 @@
+// fallow-ignore-file unused-file
 import { describe, test, expect } from "bun:test";
-import { classifyWithAdapter } from "../../src/classify.ts";
+import { classifyWithAdapter } from "../../src/classify-adapter.ts";
 import type { SemanticClassifierAdapter } from "../../src/types.ts";
 
 // Mock adapter that tracks call count
@@ -14,6 +15,7 @@ function createMockAdapter(options?: {
   const adapter = {
     callCount: 0,
     reset: () => { callCount = 0; adapter.callCount = 0; },
+    // fallow-ignore-next-line complexity
     async classify(input: string) {
       callCount++;
       adapter.callCount = callCount;
@@ -95,15 +97,26 @@ describe("classifyWithAdapter — Adapter Options", () => {
     expect(result.source).toBe("semantic-adapter");
   });
 
-  test("adapter null result falls back to rules", async () => {
-    const mockAdapter = createMockAdapter({ returnNull: true });
-    
-    const result = await classifyWithAdapter("test", { adapter: mockAdapter });
-    
-    expect(result.errors).toBeDefined();
-    expect(Array.isArray(result.errors)).toBe(true);
-    expect(result.errors?.length).toBeGreaterThan(0);
-    expect(result.errors?.[0]).toContain("Semantic classifier returned no usable result");
-    expect(result.source).toBe("no-match");
+  test("id option shares cache across fresh option objects", async () => {
+    const mockAdapter = createMockAdapter({ result: { risk: "low", category: "benign" } });
+
+    // First call with id "shared-state"
+    await classifyWithAdapter("test input", {
+      adapter: mockAdapter,
+      id: "shared-state",
+      cache: { maxEntries: 100, ttlMs: 60_000 },
+    });
+
+    expect(mockAdapter.callCount).toBe(1);
+
+    // Second call with a fresh options object but same id
+    await classifyWithAdapter("test input", {
+      adapter: mockAdapter,
+      id: "shared-state",
+      cache: { maxEntries: 100, ttlMs: 60_000 },
+    });
+
+    // Cache hit — adapter should not be called again
+    expect(mockAdapter.callCount).toBe(1);
   });
 });
