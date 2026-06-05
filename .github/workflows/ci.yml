@@ -28,10 +28,10 @@ jobs:
         if: github.event_name == 'pull_request'
         run: pnpm changeset status --since=origin/main
 
-      # PRs: block merge if new complexity introduced
-      - name: Complexity audit (new issues only)
+      # PRs: block merge if codebase score < 85
+      - name: Complexity score gate
         if: github.event_name == 'pull_request'
-        run: npx fallow audit --gate new-only
+        run: npx fallow score --gate 85
 
       # Main branch: full audit non-blocking for tracking
       - name: Complexity audit (full)
